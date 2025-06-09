@@ -1,0 +1,53 @@
+# Shared RuboCop configuration for all gems
+require:
+  - rubocop-rails
+  - rubocop-rspec
+
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 2.7
+  Exclude:
+    - 'vendor/**/*'
+    - 'tmp/**/*'
+    - 'spec/fixtures/**/*'
+
+# Style preferences
+Style/Documentation:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: single_quotes
+
+# Metrics
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+    - '*.gemspec'
+
+Metrics/ModuleLength:
+  Exclude:
+    - 'spec/**/*'
+
+# Layout
+Layout/LineLength:
+  Max: 120
+  Exclude:
+    - '*.gemspec'
+
+# Rails specific
+Rails/Output:
+  Exclude:
+    - 'lib/**/*' # Allow puts/print in library code
+
+# RSpec specific
+RSpec/ExampleLength:
+  Max: 20
+
+RSpec/MultipleExpectations:
+  Max: 5
+
+RSpec/NestedGroups:
+  Max: 4

@@ -1,0 +1,42 @@
+===============================================================================
+
+  YASS (YAML Assisted Seed System) has been installed!
+
+===============================================================================
+
+Next steps:
+
+  1. Run the migration:
+     
+     rails db:migrate
+
+  2. Configure YASS in config/initializers/yass.rb:
+     - Set your yaml_directory path
+     - Configure seed_helpers_module if you have existing seed helpers
+     - Adjust other settings as needed
+
+  3. Create your first YAML seed file:
+
+     mkdir -p db/seed/test_suites
+     
+     # Create db/seed/test_suites/example.yml with:
+     
+     metadata:
+       context: "Test Data"
+       description: "Example seed data"
+     
+     data:
+       accounts:
+         - factory: account
+           attributes:
+             name: "Test Account"
+           ref: "@test_account"
+
+  4. Load your seed data:
+
+     # In Rails console or seed file:
+     Yass::Loader.load_test_suite('example')
+
+For more information, visit: https://github.com/your-org/yass
+
+===============================================================================

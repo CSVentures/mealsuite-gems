@@ -1,0 +1,17 @@
+class CreateYassSeedRegistryEntries < ActiveRecord::Migration<%= migration_version %>
+  def change
+    create_table :yass_seed_registry_entries do |t|
+      t.string :key, null: false
+      t.string :object_class, null: false
+      t.integer :object_id, null: false
+      t.string :description
+      t.string :context, default: 'Reference Data'
+      
+      t.timestamps
+    end
+
+    add_index :yass_seed_registry_entries, :key, unique: true
+    add_index :yass_seed_registry_entries, [:object_class, :object_id]
+    add_index :yass_seed_registry_entries, :context
+  end
+end

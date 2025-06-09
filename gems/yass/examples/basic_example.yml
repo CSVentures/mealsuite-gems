@@ -1,0 +1,69 @@
+metadata:
+  context: "Test Data"
+  description: "Basic example showing YASS features"
+
+data:
+  # Create accounts first
+  accounts:
+    - factory: account
+      attributes:
+        name: "Primary Account"
+        active: true
+        domain: "example.com"
+      ref: "@primary_account"
+    
+    - factory: account
+      traits: [:enterprise]
+      attributes:
+        name: "Enterprise Account"
+        active: true
+        domain: "enterprise.com"
+      ref: "@enterprise_account"
+
+  # Create users that reference the accounts
+  users:
+    - factory: user
+      traits: [:admin]
+      attributes:
+        name: "John Doe"
+        email: "john@example.com"
+        account: "@primary_account"  # Reference to account created above
+        last_login: "registry.dates.today"  # Built-in date helper
+      ref: "@admin_user"
+    
+    - factory: user
+      attributes:
+        name: "Jane Smith"
+        email: "jane@[[\"@enterprise_account\".domain]]"  # Ruby code + reference
+        account: "@enterprise_account"
+        created_at: "[[Date.current - 1.week]]"  # Ruby code for date
+      ref: "@regular_user"
+
+  # Create projects that reference users
+  projects:
+    - factory: project
+      attributes:
+        name: "Main Project"
+        description: "Project created on [[Date.current.strftime('%B %d, %Y')]]"
+        owner: "@admin_user"
+        account: "@primary_account"
+        status: "active"
+      ref: "@main_project"
+
+  # Example of using seed helper methods
+  complex_data:
+    - method: create_menu_with_items
+      arguments:
+        account: "@primary_account"
+        name: "Weekly Menu"
+        weeks: 2
+        items_per_day: 5
+      ref: "@weekly_menu"
+
+  # Example of custom method calls
+  notifications:
+    - custom_method: send_welcome_notification
+      arguments:
+        user: "@admin_user"
+        template: "admin_welcome"
+        send_at: "registry.dates.tomorrow"

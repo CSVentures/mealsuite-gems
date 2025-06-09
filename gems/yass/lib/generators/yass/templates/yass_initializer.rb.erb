@@ -1,0 +1,18 @@
+# YASS (YAML Assisted Seed System) Configuration
+
+Yass.configure do |config|
+  # Logger for YASS operations (defaults to Rails.logger)
+  config.logger = Rails.logger
+  
+  # Directory containing YAML seed files
+  config.yaml_directory = Rails.root.join('db', 'seed', 'test_suites')
+  
+  # Your existing seed helpers module (optional)
+  # config.seed_helpers_module = SeedHelpers
+  
+  # Model class for persistent registry storage (defaults to Yass::SeedRegistryEntry)
+  config.registry_model_class = Yass::SeedRegistryEntry
+end
+
+# Ensure the YAML directory exists
+FileUtils.mkdir_p(Yass.configuration.yaml_directory) unless Dir.exist?(Yass.configuration.yaml_directory)

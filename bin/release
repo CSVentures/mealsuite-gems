@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+GEM_NAME="${1:-}"
+
+if [ -z "$GEM_NAME" ]; then
+  echo "Usage: bin/release <gem-name>"
+  echo "Available gems:"
+  ls gems/
+  exit 1
+fi
+
+if [ ! -d "gems/$GEM_NAME" ]; then
+  echo "Error: Gem '$GEM_NAME' not found in gems/ directory"
+  exit 1
+fi
+
+echo "=== Releasing $GEM_NAME ==="
+cd "gems/$GEM_NAME"
+
+# Run tests first
+echo "Running tests..."
+bundle exec rspec || {
+  echo "Tests failed! Aborting release."
+  exit 1
+}
+
+# Run RuboCop
+echo "Running RuboCop..."
+bundle exec rubocop || {
+  echo "RuboCop failed! Aborting release."
+  exit 1
+}
+
+# Build the gem
+echo "Building gem..."
+gem build *.gemspec
+
+# Extract version from gemspec
+VERSION=$(ruby -e "load '${GEM_NAME}.gemspec'; puts Gem::Specification.load('${GEM_NAME}.gemspec').version")
+GEM_FILE="${GEM_NAME}-${VERSION}.gem"
+
+echo "Built: $GEM_FILE"
+echo "To push to RubyGems: gem push $GEM_FILE"
+echo "To install locally: gem install $GEM_FILE"
+
+# Optional: Auto-push if this is a public gem
+# gem push "$GEM_FILE"

@@ -1,0 +1,10 @@
+inherit_from: ../../shared/rubocop.yml
+
+AllCops:
+  TargetRubyVersion: 2.7
+  Include:
+    - 'lib/**/*.rb'
+    - 'spec/**/*.rb'
+  Exclude:
+    - 'vendor/**/*'
+    - 'tmp/**/*'

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+GEM_NAME="${1:-}"
+
+if [ -n "$GEM_NAME" ]; then
+  # Test specific gem
+  if [ ! -d "gems/$GEM_NAME" ]; then
+    echo "Error: Gem '$GEM_NAME' not found in gems/ directory"
+    echo "Available gems:"
+    ls gems/
+    exit 1
+  fi
+  
+  echo "=== Testing $GEM_NAME ==="
+  cd "gems/$GEM_NAME"
+  bundle exec rspec
+else
+  # Test all gems
+  echo "=== Testing all gems ==="
+  for gem_dir in gems/*/; do
+    if [ -d "$gem_dir" ]; then
+      gem_name=$(basename "$gem_dir")
+      echo "Testing $gem_name..."
+      cd "$gem_dir"
+      bundle exec rspec || exit 1
+      cd - > /dev/null
+    fi
+  done
+  echo "All tests passed!"
+fi

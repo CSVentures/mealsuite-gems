@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+set -vx
+
+# Install root dependencies
+echo "=== Installing root dependencies ==="
+bundle install
+
+# Install dependencies for each gem
+echo "=== Installing gem dependencies ==="
+for gem_dir in gems/*/; do
+  if [ -d "$gem_dir" ]; then
+    gem_name=$(basename "$gem_dir")
+    echo "Installing dependencies for $gem_name"
+    cd "$gem_dir"
+    bundle install
+    cd - > /dev/null
+  fi
+done
+
+echo "=== Setup complete! ==="
+echo "Run 'bin/test' to run all tests"
+echo "Run 'rake -T' to see available tasks"

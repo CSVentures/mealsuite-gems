@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-gems: ${{ steps.changes.outputs.gems }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Detect changed gems
+        id: changes
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          else
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          fi
+          
+          # Extract unique gem names from changed files
+          CHANGED_GEMS=$(echo "$CHANGED_FILES" | grep "^gems/" | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          
+          echo "Changed files: $CHANGED_FILES"
+          echo "Changed gems: $CHANGED_GEMS"
+          echo "gems=$CHANGED_GEMS" >> $GITHUB_OUTPUT
+
+  test:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed-gems != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby-version: ['2.7', '3.0', '3.1', '3.2']
+        gem: ${{ fromJson(needs.detect-changes.outputs.changed-gems) }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby ${{ matrix.ruby-version }}
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+
+    - name: Cache gems
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.bundle
+          gems/${{ matrix.gem }}/vendor/bundle
+        key: ${{ runner.os }}-gems-${{ matrix.ruby-version }}-${{ matrix.gem }}-${{ hashFiles('gems/${{ matrix.gem }}/Gemfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-gems-${{ matrix.ruby-version }}-${{ matrix.gem }}-
+
+    - name: Install dependencies
+      run: |
+        cd gems/${{ matrix.gem }}
+        bundle install --jobs 4 --retry 3
+
+    - name: Run tests
+      run: |
+        cd gems/${{ matrix.gem }}
+        bundle exec rspec
+
+    - name: Run RuboCop
+      run: |
+        cd gems/${{ matrix.gem }}
+        bundle exec rubocop
+
+  test-all:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.1'
+
+    - name: Install dependencies
+      run: bin/setup
+
+    - name: Run all tests
+      run: bin/test
+
+    - name: Run RuboCop for all gems
+      run: rake rubocop
