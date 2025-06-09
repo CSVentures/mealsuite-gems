@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary = 'YAML Assisted Seed System - A flexible YAML seed data parser for Rails applications'
   spec.description = 'YASS (YAML Assisted Seed System) is a flexible YAML seed data parser that integrates with FactoryBot and Rails applications to provide declarative test data creation with reference resolution, bulk operations, and persistent registry management.'
-  spec.homepage = 'https://github.com/csventures/yass'
+  spec.homepage = 'https://github.com/csventures/mealsuite-gems'
   spec.license = 'Proprietary'
   spec.required_ruby_version = '>= 2.7.0'
 
