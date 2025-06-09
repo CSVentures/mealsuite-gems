@@ -6,14 +6,9 @@ source 'https://rubygems.org'
 gem 'rake', '~> 13.0'
 gem 'rspec', '~> 3.0'
 gem 'rspec-rails'
-gem 'rubocop', '~> 1.0'
+gem 'rubocop', '~> 1.21'  # Use consistent version with gems
 gem 'rubocop-rails'
 gem 'rubocop-rspec'
-
-# Load all gem dependencies for development
-Dir.glob('gems/*/Gemfile').each do |gemfile|
-  eval_gemfile gemfile
-end
 
 # Load all gemspecs for cross-gem dependencies
 Dir.glob('gems/*/*.gemspec').each do |gemspec_path|

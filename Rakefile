@@ -1,11 +1,7 @@
 # frozen_string_literal: true
 
-require 'bundler/gem_tasks'
 require 'rspec/core/rake_task'
 require 'rubocop/rake_task'
-
-# Load all gem Rakefiles
-Dir.glob('gems/*/Rakefile').each { |f| load f }
 
 desc 'Run tests for all gems'
 task :test do

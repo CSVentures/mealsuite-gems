@@ -1,6 +1,6 @@
-# CloudStorm Ventures Internal Gems
+# MealSuite Internal Gems
 
-This repository contains internal Ruby gems used across CloudStorm Ventures projects.
+This repository contains internal Ruby gems used across MealSuite projects.
 
 ## Gems
 
@@ -10,8 +10,8 @@ This repository contains internal Ruby gems used across CloudStorm Ventures proj
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/csventures/csventures-gems
-   cd csventures-gems
+   git clone https://github.com/csventures/mealsuite-gems
+   cd mealsuite-gems
    ```
 
 2. Run the setup script:
@@ -28,12 +28,12 @@ This repository contains internal Ruby gems used across CloudStorm Ventures proj
 
 ### For Production (Gemfile):
 ```ruby
-gem 'yass', git: 'https://github.com/csventures/csventures-gems', glob: 'gems/yass/*.gemspec'
+gem 'yass', git: 'https://github.com/csventures/mealsuite-gems', glob: 'gems/yass/*.gemspec'
 ```
 
 ### For Local Development (Gemfile):
 ```ruby
-gem 'yass', path: '../csventures-gems/gems/yass'
+gem 'yass', path: '../mealsuite-gems/gems/yass'
 ```
 
 ## Adding a New Gem
@@ -68,7 +68,7 @@ gem 'yass', path: '../csventures-gems/gems/yass'
 ## Directory Structure
 
 ```
-csventures-gems/
+mealsuite-gems/
 ├── gems/                     # Individual gem directories
 │   └── yass/                 # YAML Assisted Seed System
 ├── shared/                   # Shared configuration and utilities

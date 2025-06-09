@@ -1,7 +1,4 @@
 # Shared RuboCop configuration for all gems
-require:
-  - rubocop-rails
-  - rubocop-rspec
 
 AllCops:
   NewCops: enable
@@ -37,17 +34,5 @@ Layout/LineLength:
   Exclude:
     - '*.gemspec'
 
-# Rails specific
-Rails/Output:
-  Exclude:
-    - 'lib/**/*' # Allow puts/print in library code
-
-# RSpec specific
-RSpec/ExampleLength:
-  Max: 20
-
-RSpec/MultipleExpectations:
-  Max: 5
-
-RSpec/NestedGroups:
-  Max: 4
+# Removed Rails and RSpec specific rules
+# Add back as plugins when gems are properly configured

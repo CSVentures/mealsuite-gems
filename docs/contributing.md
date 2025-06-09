@@ -1,11 +1,11 @@
-# Contributing to CloudStorm Ventures Gems
+# Contributing to MealSuite Gems
 
 ## Development Setup
 
 1. Clone the repository and run setup:
    ```bash
-   git clone https://github.com/csventures/csventures-gems
-   cd csventures-gems
+   git clone https://github.com/csventures/mealsuite-gems
+   cd mealsuite-gems
    bin/setup
    ```
 
