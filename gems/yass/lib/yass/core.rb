@@ -40,31 +40,76 @@ module Yass
         )
       end
 
-      # Load and validate YAML syntax
-      yaml_content = load_and_validate_yaml(yaml_file_path)
+      # Set seeding flag to indicate YASS is actively processing
+      previous_seeding_state = Yass.configuration.seeding_active
+      Yass.configuration.seeding_active = true
 
-      # Validate YAML structure
-      validate_yaml_structure(yaml_content, yaml_file_path)
+      begin
+        # Load and validate YAML syntax
+        yaml_content = load_and_validate_yaml(yaml_file_path)
 
-      Yass.configuration.logger.info("📄 Parsing YAML seed file: #{File.basename(yaml_file_path)}")
+        # Validate YAML structure
+        validate_yaml_structure(yaml_content, yaml_file_path)
 
-      # Process in dependency order
-      process_yaml_content(yaml_content, yaml_file_path)
+        Yass.configuration.logger.info("📄 Parsing YAML seed file: #{File.basename(yaml_file_path)}")
 
-      Yass.configuration.logger.info("✅ Created #{@created_objects.count} objects from YAML")
-      @created_objects
+        # Wrap entire processing in a database transaction
+        transaction_result = nil
+        if defined?(ActiveRecord::Base)
+          Yass.configuration.logger.debug("🔄 Starting database transaction for YAML processing")
+          ActiveRecord::Base.transaction do
+            # Process in dependency order
+            process_yaml_content(yaml_content, yaml_file_path)
+            transaction_result = @created_objects
+            Yass.configuration.logger.debug("✅ Transaction completed successfully")
+          end
+        else
+          # Fallback for non-Rails environments
+          Yass.configuration.logger.debug("⚠️  No ActiveRecord detected - processing without transaction")
+          process_yaml_content(yaml_content, yaml_file_path)
+          transaction_result = @created_objects
+        end
+
+        Yass.configuration.logger.info("✅ Created #{transaction_result.count} objects from YAML")
+        transaction_result
+      ensure
+        # Always restore previous seeding state
+        Yass.configuration.seeding_active = previous_seeding_state
+      end
     rescue ParsingError => e
-      # Re-raise our custom errors as-is
-      raise e
+      # Restore seeding state and enhance error with rollback info
+      Yass.configuration.seeding_active = previous_seeding_state
+      
+      # Add transaction rollback info if we're in Rails
+      if defined?(ActiveRecord::Base) && !e.message.include?("rolled back")
+        rollback_message = "#{e.message} All database changes have been rolled back."
+        enhanced_error = ParsingError.new(
+          rollback_message,
+          file_path: e.file_path,
+          error_type: e.error_type,
+          suggestions: e.suggestions,
+          line_number: e.line_number,
+          column_number: e.column_number
+        )
+        raise enhanced_error
+      else
+        raise e
+      end
     rescue StandardError => e
-      # Wrap unexpected errors with helpful context
+      # Restore seeding state and wrap unexpected errors with helpful context
+      Yass.configuration.seeding_active = previous_seeding_state
+      
+      # Add transaction rollback info if we're in Rails
+      rollback_info = defined?(ActiveRecord::Base) ? " All database changes have been rolled back." : ""
+      
       raise ParsingError.new(
-        "An unexpected error occurred while processing the YAML file: #{e.message}",
+        "An unexpected error occurred while processing the YAML file: #{e.message}.#{rollback_info}",
         file_path: yaml_file_path,
         error_type: :unexpected,
         suggestions: [
           'Check the YAML file for syntax errors',
           'Verify all required sections are present',
+          'Check that all referenced objects exist',
           'Contact support if the error persists'
         ]
       )
@@ -464,9 +509,115 @@ module Yass
     end
 
     def create_bulk_items(model_type, config)
-      # Implementation for bulk creation would go here
-      # This is a complex feature that would need careful extraction
-      raise NotImplementedError, 'Bulk creation not yet implemented in gem version'
+      bulk_config = config['bulk_create']
+      template = bulk_config['template']
+      count = bulk_config['count']
+
+      unless template
+        line_number = get_current_item_line_number
+        raise ParsingError.new(
+          "Bulk creation requires a 'template' section with the item configuration.",
+          file_path: @yaml_file_path,
+          error_type: :missing_template,
+          line_number: line_number,
+          suggestions: [
+            'Add a template section with factory and attributes',
+            'Example: template:\n  factory: menu_item\n  attributes:\n    name: "Item {{index}}"'
+          ]
+        )
+      end
+
+      unless count
+        line_number = get_current_item_line_number
+        raise ParsingError.new(
+          "Bulk creation requires a 'count' specifying how many items to create.",
+          file_path: @yaml_file_path,
+          error_type: :missing_count,
+          line_number: line_number,
+          suggestions: [
+            'Add a count field specifying the number of items to create',
+            'Example: count: 84'
+          ]
+        )
+      end
+
+      created_items = []
+      
+      count.times do |index|
+        # Create a copy of the template for this iteration
+        item_config = deep_copy_hash(template)
+        
+        # Process template interpolation
+        item_config = interpolate_template_variables(item_config, index)
+        
+        # Create the item using the standard creation process
+        item = create_single_item(model_type, item_config)
+        created_items << item
+      end
+
+      created_items
+    end
+
+    def deep_copy_hash(hash)
+      case hash
+      when Hash
+        result = {}
+        hash.each { |key, value| result[key] = deep_copy_hash(value) }
+        result
+      when Array
+        hash.map { |item| deep_copy_hash(item) }
+      else
+        hash
+      end
+    end
+
+    def interpolate_template_variables(config, index)
+      case config
+      when Hash
+        result = {}
+        config.each do |key, value|
+          result[key] = interpolate_template_variables(value, index)
+        end
+        result
+      when Array
+        config.map { |item| interpolate_template_variables(item, index) }
+      when String
+        # Replace {{index}} and other template variables
+        interpolated = config.gsub('{{index}}', index.to_s)
+        
+        # Handle mathematical expressions in templates like {{index / 21 + 1}}
+        interpolated = interpolated.gsub(/\{\{([^}]+)\}\}/) do |match|
+          expression = Regexp.last_match(1)
+          begin
+            # Create a safe context for evaluation with only index available
+            safe_eval_context = Object.new
+            safe_eval_context.define_singleton_method(:index) { index }
+            
+            # Evaluate the expression in the safe context
+            result = safe_eval_context.instance_eval(expression)
+            result.to_s
+          rescue StandardError, SyntaxError => e
+            line_number = get_current_item_line_number
+            raise ParsingError.new(
+              "Error evaluating template expression '#{expression}': #{e.message}",
+              file_path: @yaml_file_path,
+              error_type: :template_expression_error,
+              line_number: line_number,
+              suggestions: [
+                'Check the syntax of your template expression',
+                'Make sure you only use simple mathematical operations',
+                'Available variables: index (current item number, starting from 0)',
+                'Example expressions: {{index}}, {{index + 1}}, {{index / 7 + 1}}'
+              ]
+            )
+          end
+        end
+        
+        # After template interpolation, check if we need to resolve references or Ruby code
+        @reference_resolver.resolve_value(interpolated)
+      else
+        config
+      end
     end
   end
 
@@ -695,6 +846,25 @@ module Yass
       result = eval(code)
       Yass.configuration.logger.debug("🔧 Executed Ruby code: #{code} → #{result}")
       result
+    rescue LoadError => e
+      line_number = @parser_context&.get_current_item_line_number
+      file_path = @parser_context&.instance_variable_get(:@yaml_file_path)
+
+      # Extract the constant name from the LoadError message
+      constant_name = e.message.match(/Unable to autoload constant (\w+)/i)&.captures&.first || 'Unknown'
+      
+      raise ParsingError.new(
+        "The system couldn't find the '#{constant_name}' model or class needed for your data.",
+        file_path: file_path,
+        error_type: :missing_model_error,
+        line_number: line_number,
+        suggestions: [
+          "Check if '#{constant_name}' is the correct model name (try checking similar names)",
+          "Make sure the application has loaded all required models",
+          "Try using a registry reference like 'registry.#{constant_name.downcase}.name' instead",
+          "Consider creating the #{constant_name} data first, or use a simpler default value"
+        ]
+      )
     rescue StandardError => e
       line_number = @parser_context&.get_current_item_line_number
       file_path = @parser_context&.instance_variable_get(:@yaml_file_path)

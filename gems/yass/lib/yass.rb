@@ -22,6 +22,11 @@ module Yass
     def reset_configuration!
       self.configuration = Configuration.new
     end
+
+    # Convenience method to check if YASS is actively processing seed files
+    def seeding_active?
+      configuration&.seeding_active == true
+    end
   end
 
   # Initialize with default configuration

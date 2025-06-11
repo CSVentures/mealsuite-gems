@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-06-11
+
+### Added
+- Bulk creation functionality with template interpolation
+- Template variable support using {{index}} syntax
+- Mathematical expressions in templates (e.g., {{index / 3 + 1}})
+- Deep hash copying for template processing
+- Comprehensive error handling for bulk creation scenarios
+- Full test coverage for bulk creation features
+
+### Features
+- Create multiple objects from a single template configuration
+- Support for dynamic attribute generation based on item index
+- Reference resolution within bulk creation templates
+- Safe template expression evaluation with detailed error messages
+
+## [0.1.0] - 2025-06-09
+
 ### Added
 - YASS (YAML Assisted Seed System) gem structure and core functionality
 - YAML seed parser with FactoryBot integration

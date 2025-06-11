@@ -4,7 +4,7 @@ require 'logger'
 
 module Yass
   class Configuration
-    attr_accessor :seed_helpers_module, :registry_model_class, :yaml_directory
+    attr_accessor :seed_helpers_module, :registry_model_class, :yaml_directory, :seeding_active
     attr_reader :logger
 
     def initialize
@@ -12,6 +12,7 @@ module Yass
       @seed_helpers_module = nil
       @registry_model_class = defined?(Yass::SeedRegistryEntry) ? Yass::SeedRegistryEntry : nil
       @yaml_directory = default_yaml_directory
+      @seeding_active = false
     end
 
     def logger=(new_logger)

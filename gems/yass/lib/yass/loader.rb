@@ -84,6 +84,10 @@ module Yass
         delegate_context = options[:delegate_context]
         parser = Core.new(delegate_context)
 
+        # Set seeding flag to indicate YASS is actively processing
+        previous_seeding_state = Yass.configuration.seeding_active
+        Yass.configuration.seeding_active = true
+
         begin
           # Parse YAML content
           parsed_yaml = YAML.safe_load(yaml_content)
@@ -97,14 +101,28 @@ module Yass
           parser.instance_variable_set(:@yaml_file_path, temp_file.path)
           parser.instance_variable_set(:@yaml_lines, yaml_content.lines)
 
-          # Process the content
-          parser.send(:process_yaml_content, parsed_yaml, temp_file.path)
+          # Wrap entire processing in a database transaction
+          transaction_result = nil
+          if defined?(ActiveRecord::Base)
+            ActiveRecord::Base.transaction do
+              # Process the content
+              parser.send(:process_yaml_content, parsed_yaml, temp_file.path)
+              transaction_result = parser.created_objects
+            end
+          else
+            # Fallback for non-Rails environments
+            parser.send(:process_yaml_content, parsed_yaml, temp_file.path)
+            transaction_result = parser.created_objects
+          end
 
           temp_file.unlink
-          parser.created_objects
+          transaction_result
         rescue StandardError => e
           temp_file&.unlink
           raise e
+        ensure
+          # Always restore previous seeding state
+          Yass.configuration.seeding_active = previous_seeding_state
         end
       end
 
