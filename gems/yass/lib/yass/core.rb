@@ -25,7 +25,7 @@ module Yass
       @yaml_context = 'Reference Data' # Default context for registry entries
     end
 
-    def parse_file(yaml_file_path)
+    def parse_file(yaml_file_path, options = {})
       # Check if file exists
       unless File.exist?(yaml_file_path)
         raise ParsingError.new(
@@ -40,6 +40,9 @@ module Yass
         )
       end
 
+      # Check for read_only mode
+      read_only = options[:read_only] || false
+
       # Set seeding flag to indicate YASS is actively processing
       previous_seeding_state = Yass.configuration.seeding_active
       Yass.configuration.seeding_active = true
@@ -51,26 +54,49 @@ module Yass
         # Validate YAML structure
         validate_yaml_structure(yaml_content, yaml_file_path)
 
-        Yass.configuration.logger.info("📄 Parsing YAML seed file: #{File.basename(yaml_file_path)}")
+        if read_only
+          Yass.configuration.logger.info("🔍 Validating YAML seed file (read-only mode): #{File.basename(yaml_file_path)}")
+        else
+          Yass.configuration.logger.info("📄 Parsing YAML seed file: #{File.basename(yaml_file_path)}")
+        end
 
         # Wrap entire processing in a database transaction
         transaction_result = nil
         if defined?(ActiveRecord::Base)
-          Yass.configuration.logger.debug("🔄 Starting database transaction for YAML processing")
+          if read_only
+            Yass.configuration.logger.debug("🔄 Starting read-only validation transaction")
+          else
+            Yass.configuration.logger.debug("🔄 Starting database transaction for YAML processing")
+          end
+          
           ActiveRecord::Base.transaction do
             # Process in dependency order
             process_yaml_content(yaml_content, yaml_file_path)
             transaction_result = @created_objects
-            Yass.configuration.logger.debug("✅ Transaction completed successfully")
+            
+            if read_only
+              Yass.configuration.logger.debug("✅ Read-only validation completed - rolling back transaction")
+              raise ActiveRecord::Rollback # Rollback transaction in read-only mode
+            else
+              Yass.configuration.logger.debug("✅ Transaction completed successfully")
+            end
           end
         else
           # Fallback for non-Rails environments
-          Yass.configuration.logger.debug("⚠️  No ActiveRecord detected - processing without transaction")
+          if read_only
+            Yass.configuration.logger.debug("⚠️  No ActiveRecord detected - read-only mode will process without transaction")
+          else
+            Yass.configuration.logger.debug("⚠️  No ActiveRecord detected - processing without transaction")
+          end
           process_yaml_content(yaml_content, yaml_file_path)
           transaction_result = @created_objects
         end
 
-        Yass.configuration.logger.info("✅ Created #{transaction_result.count} objects from YAML")
+        if read_only
+          Yass.configuration.logger.info("✅ Validated #{transaction_result.count} objects from YAML (no data persisted)")
+        else
+          Yass.configuration.logger.info("✅ Created #{transaction_result.count} objects from YAML")
+        end
         transaction_result
       ensure
         # Always restore previous seeding state
@@ -95,7 +121,15 @@ module Yass
       else
         raise e
       end
-    rescue StandardError => e
+    rescue => e
+      # Check if this is ActiveRecord::Rollback from read-only mode
+      if defined?(ActiveRecord::Rollback) && e.is_a?(ActiveRecord::Rollback)
+        # This is expected in read-only mode, don't treat as error
+        # Restore seeding state and return
+        Yass.configuration.seeding_active = previous_seeding_state
+        return transaction_result
+      end
+      
       # Restore seeding state and wrap unexpected errors with helpful context
       Yass.configuration.seeding_active = previous_seeding_state
       

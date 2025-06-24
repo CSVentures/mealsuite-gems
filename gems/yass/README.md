@@ -69,6 +69,10 @@ results = Yass::Loader.load_multiple(['users_test', 'accounts_test'])
 # Load from YAML content string
 yaml_content = File.read('my_seed.yml')
 objects = Yass::Loader.load_from_content(yaml_content)
+
+# Validate YAML without persisting data (read-only mode)
+objects = Yass::Loader.load_test_suite('basic_facility_test', read_only: true)
+objects = Yass::Loader.load_from_content(yaml_content, read_only: true)
 ```
 
 ### Direct Parsing
@@ -76,7 +80,39 @@ objects = Yass::Loader.load_from_content(yaml_content)
 ```ruby
 parser = Yass::Core.new(self) # Pass delegate context if needed
 objects = parser.parse_file('path/to/seed.yml')
+
+# Read-only validation mode
+objects = parser.parse_file('path/to/seed.yml', read_only: true)
 ```
+
+### Read-Only Mode
+
+YASS supports a read-only mode that allows you to validate YAML syntax and content without actually persisting any data to the database. This is useful for:
+
+- Validating YAML file structure and syntax
+- Testing factory configurations and references
+- Checking for potential errors before actual data creation
+- Dry-run validation in CI/CD pipelines
+
+```ruby
+# Validate a test suite without creating data
+objects = Yass::Loader.load_test_suite('my_test_suite', read_only: true)
+
+# Validate YAML content without persisting
+yaml_content = File.read('test_data.yml')
+objects = Yass::Loader.load_from_content(yaml_content, read_only: true)
+
+# Direct parser validation
+parser = Yass::Core.new
+objects = parser.parse_file('path/to/seed.yml', read_only: true)
+```
+
+In read-only mode:
+- All models are created within a database transaction
+- The transaction is automatically rolled back after validation
+- All syntax and reference validations are performed
+- Created objects are returned for inspection
+- No data is actually persisted to the database
 
 ### Registry Management
 

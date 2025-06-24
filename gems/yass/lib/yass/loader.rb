@@ -29,19 +29,27 @@ module Yass
             )
           end
 
-          Yass.configuration.logger.info("🔄 Loading test suite: #{suite_name}")
+          if options[:read_only]
+            Yass.configuration.logger.info("🔄 Validating test suite: #{suite_name}")
+          else
+            Yass.configuration.logger.info("🔄 Loading test suite: #{suite_name}")
+          end
           start_time = Time.now
 
           # Pass the calling context as delegate if available
           delegate_context = options[:delegate_context]
           parser = Core.new(delegate_context)
-          created_objects = parser.parse_file(yaml_file)
+          created_objects = parser.parse_file(yaml_file, options)
 
           duration = Time.now - start_time
-          Yass.configuration.logger.info("✅ Loaded #{suite_name} (#{created_objects.count} objects in #{duration.round(2)}s)")
+          if options[:read_only]
+            Yass.configuration.logger.info("✅ Validated #{suite_name} (#{created_objects.count} objects in #{duration.round(2)}s)")
+          else
+            Yass.configuration.logger.info("✅ Loaded #{suite_name} (#{created_objects.count} objects in #{duration.round(2)}s)")
+          end
 
-          # Export ID mappings if requested
-          export_id_mappings(suite_name, created_objects) if options[:export_mappings]
+          # Export ID mappings if requested (skip in read-only mode)
+          export_id_mappings(suite_name, created_objects) if options[:export_mappings] && !options[:read_only]
 
           created_objects
         rescue ParsingError => e
@@ -82,6 +90,7 @@ module Yass
 
       def load_from_content(yaml_content, options = {})
         delegate_context = options[:delegate_context]
+        read_only = options[:read_only] || false
         parser = Core.new(delegate_context)
 
         # Set seeding flag to indicate YASS is actively processing
@@ -108,6 +117,10 @@ module Yass
               # Process the content
               parser.send(:process_yaml_content, parsed_yaml, temp_file.path)
               transaction_result = parser.created_objects
+              
+              if read_only
+                raise ActiveRecord::Rollback # Rollback transaction in read-only mode
+              end
             end
           else
             # Fallback for non-Rails environments
@@ -117,8 +130,13 @@ module Yass
 
           temp_file.unlink
           transaction_result
-        rescue StandardError => e
+        rescue => e
           temp_file&.unlink
+          # Check if this is ActiveRecord::Rollback from read-only mode
+          if defined?(ActiveRecord::Rollback) && e.is_a?(ActiveRecord::Rollback)
+            # This is expected in read-only mode, don't treat as error
+            return transaction_result
+          end
           raise e
         ensure
           # Always restore previous seeding state
