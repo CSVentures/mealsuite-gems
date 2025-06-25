@@ -23,6 +23,10 @@ module Yass
         template 'yass_initializer.rb.erb', 'config/initializers/yass.rb'
       end
 
+      def add_route
+        route 'mount Yass::Engine => "/yass"'
+      end
+
       def show_readme
         readme 'README'
       end

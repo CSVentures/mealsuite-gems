@@ -1,0 +1,48 @@
+metadata:
+  context: "YASS Web Interface Demo"
+  description: "Example YAML file to demonstrate the YASS web interface features"
+
+data:
+  # Example users
+  users:
+    - factory: user
+      attributes:
+        name: "John Demo"
+        email: "john@example.com"
+      ref: "@demo_user"
+    
+    - factory: user
+      attributes:
+        name: "Jane Test"
+        email: "jane@example.com"
+      ref: "@test_user"
+
+  # Example posts referencing users
+  posts:
+    - factory: post
+      attributes:
+        title: "Welcome to YASS"
+        content: "This is a demo post created via the YASS web interface"
+        user: "@demo_user"
+      ref: "@welcome_post"
+    
+    - factory: post
+      attributes:
+        title: "YAML Seed Management"
+        content: "YASS makes it easy to manage test data with YAML files"
+        user: "@test_user"
+      ref: "@info_post"
+
+  # Example categories
+  categories:
+    - factory: category
+      attributes:
+        name: "Technology"
+        description: "Tech-related content"
+      ref: "@tech_category"
+    
+    - factory: category
+      attributes:
+        name: "Tutorials"
+        description: "How-to guides and tutorials"
+      ref: "@tutorial_category"

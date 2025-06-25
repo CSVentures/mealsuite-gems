@@ -1,0 +1,197 @@
+- content_for :title, "YASS Seed Registry"
+
+:css
+  .registry-stats { background: #f8f9fa; border-radius: 0.375rem; padding: 1rem; margin-bottom: 1rem; }
+  .registry-stats .stat-item { margin-bottom: 0.5rem; }
+  .registry-stats .stat-value { font-weight: bold; color: #495057; }
+  .orphaned-entry { background-color: #fff3cd !important; }
+  .registry-search { margin-bottom: 1rem; }
+  .model-filter { margin-bottom: 1rem; }
+
+.row
+  .col-lg-3
+    .registry-stats
+      %h6
+        %i.fas.fa-chart-bar
+        Registry Statistics
+      .stat-item
+        %span Total Entries: 
+        %span.stat-value= @total_count
+      .stat-item
+        %span Orphaned: 
+        %span.stat-value.text-warning= @orphaned_count
+      - if @model_counts.any?
+        %hr
+        %small.text-muted Model Types:
+        - @model_counts.each do |model, count|
+          .stat-item.small
+            %span= model + ": "
+            %span.stat-value= count
+
+    .model-filter
+      = form_with url: yass.seed_registry_path, method: :get, local: true do |f|
+        = f.hidden_field :search, value: @search_term
+        = f.select :model_filter, 
+          options_for_select([['All Models', 'all']] + @model_counts.map { |model, count| [model, model] }, @model_filter),
+          {}, 
+          { class: 'form-control form-control-sm', onchange: 'this.form.submit();' }
+
+  .col-lg-9
+    .d-flex.justify-content-between.align-items-center.mb-3
+      %h4
+        %i.fas.fa-database
+        Seed Registry Browser
+        %small.text-muted #{@total_count} entries
+      
+      .btn-group
+        %button.btn.btn-outline-secondary.btn-sm{data: {toggle: 'modal', target: '#statsModal'}}
+          %i.fas.fa-info-circle
+          Statistics
+        - if @orphaned_count > 0
+          %button.btn.btn-outline-warning.btn-sm#clean-orphaned-btn{title: "Clean #{@orphaned_count} orphaned entries"}
+            %i.fas.fa-broom
+            Clean Orphaned
+
+    .registry-search
+      = form_with url: yass.seed_registry_path, method: :get, local: true do |f|
+        = f.hidden_field :model_filter, value: @model_filter
+        .input-group
+          = f.text_field :search, 
+            value: @search_term, 
+            placeholder: 'Search registry keys...', 
+            class: 'form-control'
+          .input-group-append
+            = f.submit 'Search', class: 'btn btn-outline-secondary'
+            - if @search_term.present?
+              = link_to 'Clear', yass.seed_registry_path(model_filter: @model_filter), class: 'btn btn-outline-secondary'
+
+    - if @entries.any?
+      .table-responsive
+        %table.table.table-hover.table-sm
+          %thead.thead-light
+            %tr
+              %th Key
+              %th Model
+              %th Object ID
+              %th Context
+              %th Object Preview
+              %th Status
+              %th Actions
+          %tbody
+            - @entries.each do |entry|
+              %tr{class: (entry.object_exists? ? '' : 'orphaned-entry')}
+                %td
+                  %code= entry.key
+                %td
+                  %span.badge.badge-info= entry.object_class
+                %td= entry.object_id
+                %td
+                  %small.text-muted= entry.context || 'Reference Data'
+                %td
+                  %small= truncate(entry.object_preview || 'N/A', length: 50)
+                %td
+                  - if entry.object_exists?
+                    %span.badge.badge-success
+                      %i.fas.fa-check
+                      Exists
+                  - else
+                    %span.badge.badge-warning
+                      %i.fas.fa-exclamation-triangle
+                      Orphaned
+                %td
+                  = link_to yass.seed_registry_path(entry), 
+                    class: 'btn btn-sm btn-outline-primary',
+                    title: 'View Details' do
+                    %i.fas.fa-eye
+
+      .d-flex.justify-content-between.align-items-center.mt-3
+        %small.text-muted
+          Showing #{@entries.count} of #{@total_count} entries
+        - if @entries.count >= 50
+          .btn-group
+            = link_to yass.seed_registry_path(search: @search_term, model_filter: @model_filter, per_page: 100), 
+              class: 'btn btn-sm btn-outline-secondary' do
+              Show 100
+            = link_to yass.seed_registry_path(search: @search_term, model_filter: @model_filter, per_page: 500), 
+              class: 'btn btn-sm btn-outline-secondary' do
+              Show 500
+
+    - else
+      .alert.alert-info
+        %i.fas.fa-info-circle
+        No entries found
+        - if @search_term.present? || (@model_filter.present? && @model_filter != 'all')
+          matching your search criteria.
+          = link_to 'Show all entries', yass.seed_registry_path, class: 'btn btn-sm btn-outline-primary ml-2'
+        - else
+          in the registry. Load some YAML files to populate the registry.
+
+/ Statistics Modal
+#statsModal.modal.fade{tabindex: "-1", role: "dialog"}
+  .modal-dialog.modal-lg{role: "document"}
+    .modal-content
+      .modal-header
+        %h5.modal-title
+          %i.fas.fa-chart-bar
+          Registry Statistics
+        %button{type: "button", class: "close", "data-dismiss": "modal"}
+          %span &times;
+      .modal-body
+        .row
+          .col-md-6
+            %h6 Overview
+            %table.table.table-sm
+              %tr
+                %td Total Entries:
+                %td.font-weight-bold= @total_count
+              %tr
+                %td Orphaned Entries:
+                %td.font-weight-bold.text-warning= @orphaned_count
+              %tr
+                %td Health Percentage:
+                %td.font-weight-bold
+                  - health = @total_count > 0 ? (((@total_count - @orphaned_count).to_f / @total_count) * 100).round(1) : 100
+                  %span{class: health >= 90 ? 'text-success' : (health >= 70 ? 'text-warning' : 'text-danger')}
+                    = "#{health}%"
+
+          .col-md-6
+            %h6 Model Distribution
+            - if @model_counts.any?
+              - total = @model_counts.sum { |_, count| count }
+              - @model_counts.each do |model, count|
+                .d-flex.justify-content-between.align-items-center.mb-1
+                  %span= model
+                  %span
+                    %span.badge.badge-info= count
+                    %small.text-muted= "(#{((count.to_f / total) * 100).round(1)}%)"
+            - else
+              %p.text-muted No entries to analyze
+
+      .modal-footer
+        %button{type: "button", class: "btn btn-secondary", "data-dismiss": "modal"} Close
+
+:javascript
+  document.addEventListener('DOMContentLoaded', function() {
+    // Clean orphaned entries button
+    const cleanBtn = document.getElementById('clean-orphaned-btn');
+    if (cleanBtn) {
+      cleanBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to clean orphaned entries? This will permanently delete registry entries for objects that no longer exist.')) {
+          fetch('#{yass.clean_orphaned_seed_registry_path}', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+          .then(response => response.json())
+          .then(data => {
+            alert(data.message);
+            location.reload(); // Refresh the page to show updated counts
+          })
+          .catch(error => {
+            alert('Error cleaning orphaned entries: ' + error.message);
+          });
+        }
+      });
+    }
+  });

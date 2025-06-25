@@ -1,0 +1,191 @@
+- content_for :title, "Registry Entry: #{@entry.key}"
+
+:css
+  .registry-detail { background: #f8f9fa; border-radius: 0.375rem; padding: 1rem; margin-bottom: 1rem; }
+  .attribute-table th { background-color: #e9ecef; width: 30%; }
+  .method-result { font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; }
+  .orphaned-warning { border-left: 4px solid #ffc107; }
+
+.row
+  .col-12
+    .d-flex.justify-content-between.align-items-center.mb-3
+      %h4
+        %i.fas.fa-database
+        Registry Entry Details
+      = link_to yass.seed_registry_path, class: 'btn btn-outline-secondary' do
+        %i.fas.fa-arrow-left
+        Back to Registry
+
+.row
+  .col-lg-4
+    .registry-detail
+      %h6
+        %i.fas.fa-info-circle
+        Entry Information
+      %table.table.table-sm.mb-0
+        %tr
+          %th Key:
+          %td
+            %code= @entry.key
+        %tr
+          %th Model Class:
+          %td
+            %span.badge.badge-info= @entry.object_class
+        %tr
+          %th Object ID:
+          %td= @entry.object_id
+        %tr
+          %th Context:
+          %td= @entry.context || 'Reference Data'
+        %tr
+          %th Description:
+          %td= @entry.description || 'N/A'
+        %tr
+          %th Created:
+          %td= time_ago_in_words(@entry.created_at) + ' ago'
+        %tr
+          %th Status:
+          %td
+            - if @object_exists
+              %span.badge.badge-success
+                %i.fas.fa-check
+                Object Exists
+            - else
+              %span.badge.badge-warning
+                %i.fas.fa-exclamation-triangle
+                Orphaned Entry
+
+  .col-lg-8
+    - if @object_exists && @object
+      .card
+        .card-header
+          %h6.mb-0
+            %i.fas.fa-table
+            Object Attributes
+        .card-body
+          - if @object_attributes.any?
+            .table-responsive
+              %table.table.table-sm.attribute-table
+                %thead
+                  %tr
+                    %th Attribute
+                    %th Value
+                    %th Type
+                %tbody
+                  - @object_attributes.each do |attr, value|
+                    %tr
+                      %td
+                        %code= attr
+                      %td
+                        - if value.nil?
+                          %em.text-muted nil
+                        - elsif value.is_a?(String) && value.length > 100
+                          = truncate(value, length: 100)
+                          %small.text-muted (truncated)
+                        - else
+                          = value.inspect
+                      %td
+                        %small.text-muted= value.class.name
+          - else
+            %p.text-muted No attributes available
+
+      - if @object_methods && @object_methods.any?
+        .card.mt-3
+          .card-header
+            %h6.mb-0
+              %i.fas.fa-cogs
+              Useful Methods
+          .card-body
+            %table.table.table-sm
+              %thead
+                %tr
+                  %th Method
+                  %th Result
+              %tbody
+                - @object_methods.each do |method, result|
+                  %tr
+                    %td
+                      %code= "#{method}()"
+                    %td.method-result
+                      - if result.is_a?(String) && result.start_with?('Error:')
+                        %span.text-danger= result
+                      - else
+                        = result.inspect
+
+      - if @associations && @associations.any?
+        .card.mt-3
+          .card-header
+            %h6.mb-0
+              %i.fas.fa-link
+              Associations (Sample)
+          .card-body
+            %table.table.table-sm
+              %thead
+                %tr
+                  %th Association
+                  %th Value
+              %tbody
+                - @associations.each do |assoc, value|
+                  %tr
+                    %td
+                      %code= assoc
+                    %td.method-result
+                      - if value.is_a?(String) && value.start_with?('Error:')
+                        %span.text-danger= value
+                      - else
+                        = value
+
+    - else
+      .alert.alert-warning.orphaned-warning
+        %h5
+          %i.fas.fa-exclamation-triangle
+          Orphaned Registry Entry
+        %p
+          This registry entry points to a 
+          %strong= @entry.object_class
+          with ID 
+          %strong= @entry.object_id
+          that no longer exists in the database.
+        %p.mb-0
+          %strong Possible causes:
+        %ul.mb-0
+          %li The object was deleted after being registered
+          %li The database was reset or restored from a backup
+          %li The object was moved to a different ID
+        
+        %hr
+        %p.mb-0
+          %strong Recommended actions:
+        %ul.mb-0
+          %li Check if similar objects exist with different IDs
+          %li Re-run the YAML seed files to recreate the object
+          %li Clean orphaned entries from the registry if no longer needed
+
+.row.mt-4
+  .col-12
+    .card
+      .card-header
+        %h6.mb-0
+          %i.fas.fa-code
+          Raw Entry Data
+      .card-body
+        %pre
+          %code= JSON.pretty_generate(@entry.as_json)
+
+:javascript
+  document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh orphaned status every 30 seconds
+    setInterval(function() {
+      if (!#{@object_exists}) {
+        // Only refresh if currently showing as orphaned
+        fetch('#{yass.seed_registry_path(@entry)}.json')
+          .then(response => response.json())
+          .then(data => {
+            if (data.object_exists !== #{@object_exists}) {
+              location.reload(); // Status changed, refresh the page
+            }
+          })
+          .catch(error => console.log('Status check failed:', error));
+      }
+    }, 30000);
+  });

@@ -8,6 +8,7 @@ require_relative 'yass/seed_registry_entry'
 require_relative 'yass/date_helper'
 require_relative 'yass/core'
 require_relative 'yass/loader'
+require_relative 'yass/engine' if defined?(Rails)
 
 module Yass
   class << self

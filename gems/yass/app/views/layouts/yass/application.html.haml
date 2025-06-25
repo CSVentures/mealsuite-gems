@@ -1,0 +1,66 @@
+!!!
+%html{lang: "en"}
+  %head
+    %meta{charset: "utf-8"}/
+    %meta{name: "viewport", content: "width=device-width, initial-scale=1, shrink-to-fit=no"}/
+    %title= content_for?(:title) ? yield(:title) : "YASS - YAML Assisted Seed System"
+    
+    / Bootstrap CSS
+    %link{href: "https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css", rel: "stylesheet", integrity: "sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N", crossorigin: "anonymous"}
+    / Font Awesome
+    %link{href: "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css", rel: "stylesheet"}
+    
+    :css
+      body {
+        background-color: #f8f9fa;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+      .navbar-brand {
+        font-weight: bold;
+      }
+      .card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        margin-bottom: 1.5rem;
+      }
+      .table th {
+        border-top: none;
+        background-color: #f8f9fa;
+      }
+      code {
+        color: #e83e8c;
+        background-color: #f8f9fa;
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.25rem;
+      }
+      .badge {
+        font-size: 0.75em;
+      }
+      pre {
+        font-size: 0.875rem;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+  %body
+    / Navigation
+    %nav.navbar.navbar-expand-lg.navbar-dark.bg-dark
+      .container-fluid
+        = link_to (content_for?(:title) ? yield(:title) : "YASS"), yass.root_path, class: "navbar-brand"
+        .navbar-nav.ml-auto
+          = link_to yass.data_seeding_path, class: "nav-link btn btn-outline-light btn-sm ml-2" do
+            %i.fas.fa-upload
+            Data Seeding
+          = link_to yass.seed_registry_path, class: "nav-link btn btn-outline-info btn-sm ml-2" do
+            %i.fas.fa-list
+            Seed Registry
+
+    / Main Content
+    .container-fluid.mt-4
+      = yield
+
+    / Bootstrap JS
+    %script{src: "https://code.jquery.com/jquery-3.6.0.min.js", integrity: "sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=", crossorigin: "anonymous"}
+    %script{src: "https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js", integrity: "sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct", crossorigin: "anonymous"}
+    / JS-YAML for parsing YAML content
+    %script{src: "https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js", integrity: "sha512-CSBhVREyzHAjAFfBlIBakjoRUKp5h7VSweP0InR/pAJyptH7peuhCsqAI/snV+TwZmXZqoUklpXp6R6wMnYf5Q==", crossorigin: "anonymous"}

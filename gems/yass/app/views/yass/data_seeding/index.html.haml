@@ -1,0 +1,1155 @@
+- content_for :title, "YASS Data Seeding Interface"
+
+:css
+  .text-sm { font-size: 0.875rem; }
+  .small { font-size: 0.875rem; }
+  .font-weight-medium { font-weight: 500; }
+  .yaml-file-main-item:hover { background-color: #f8f9fa; }
+  .yaml-files-container .list-group-item { border-left: none; border-right: none; }
+  .btn-group .btn { color: white; }
+  .btn-group .btn + .btn { margin-left: 0.25rem; }
+  #backup-dropdown-list { max-height: 200px; overflow-y: auto; }
+  #backup-dropdown-list .dropdown-item { padding: 0.5rem 1rem; }
+  #backup-dropdown-list .dropdown-item div { line-height: 1.2; }
+  
+  /* Raw YAML textarea viewport height adjustments */
+  .raw-yaml-container {
+    height: calc(100vh - 300px);
+    min-height: 400px;
+  }
+  .raw-yaml-textarea {
+    height: calc(100% - 120px);
+    min-height: 300px;
+    resize: vertical;
+  }
+  
+  /* Line numbered textarea styling */
+  .lined-textarea-container {
+    position: relative;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    background: white;
+  }
+  .lined-textarea-container:focus-within {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+  .line-numbers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50px;
+    height: 100%;
+    background: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #6c757d;
+    text-align: right;
+    padding: 8px 4px;
+    user-select: none;
+    pointer-events: none;
+    overflow: hidden;
+    white-space: pre;
+  }
+  .lined-textarea {
+    width: 100%;
+    height: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 8px 8px 8px 58px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    background: transparent;
+    overflow-y: auto;
+    white-space: pre;
+    word-wrap: normal;
+  }
+  .lined-textarea:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+/ Environment status header
+.row.mb-3
+  .col-12
+    .alert.alert-info.py-2.mb-0{id: "status-header"}
+      .row.align-items-center.small
+        .col-md-3
+          %strong Environment: 
+          %span.badge.badge-info.mr-1= Rails.env
+          %br
+          %strong Registry: 
+          %span#registry-count.mr-1= defined?(SeedRegistryEntry) ? (SeedRegistryEntry.table_exists? ? SeedRegistryEntry.count : 0) : 0
+          %span entries
+        .col-md-4
+          %strong Database: 
+          %code.small= ActiveRecord::Base.connection.current_database
+          %br
+          %strong Status: 
+          %span#environment-status
+            %span.badge.badge-success.small
+              %i.fas.fa-check
+              Ready for YAML operations
+        .col-md-5.text-md-right
+          %strong YASS Version: 
+          %span.badge.badge-secondary= Yass::VERSION
+          %br
+          %strong Gem: 
+          %span.text-muted YAML Assisted Seed System
+
+.row.mt-3
+  .col-md-12
+    .card
+      .card-body
+        .row
+          .col-md-12
+            / Three-tab navigation
+            %ul.nav.nav-tabs{id: "yaml-tabs", role: "tablist"}
+              %li.nav-item
+                %a.nav-link.active{id: "batch-yaml-tab", "data-toggle": "tab", href: "#batch-yaml-panel", role: "tab"} Load YAML Files
+              %li.nav-item
+                %a.nav-link{id: "file-list-tab", "data-toggle": "tab", href: "#file-list-panel", role: "tab"} Load File List
+              %li.nav-item
+                %a.nav-link{id: "raw-yaml-tab", "data-toggle": "tab", href: "#raw-yaml-panel", role: "tab"} Raw YAML
+            
+            .tab-content{id: "yaml-tab-content"}
+              / Tab 1: Load YAML Files (individual files with run buttons)
+              .tab-pane.fade.show.active{id: "batch-yaml-panel", role: "tabpanel"}
+                .mt-3
+                  .form-group
+                    %input{type: "text", id: "file-search", class: "form-control", placeholder: "Search by file or directory name..."}
+                  
+                  %div#yaml-files-container{style: "height: calc(100vh - 350px); min-height: 300px; overflow-y: auto;"}
+                    .text-center.py-3
+                      %i.fas.fa-spinner.fa-spin
+                      Loading YAML files...
+              
+              / Tab 2: Load File List (batch)
+              .tab-pane.fade{id: "file-list-panel", role: "tabpanel"}
+                .mt-3
+                  .row
+                    .col-md-6
+                      %form#yaml-files-form
+                        .form-group
+                          %label Batch Load Multiple Files
+                          .input-group
+                            %textarea{name: "files", placeholder: "facility_with_diners.yml\nexample_data.yml", rows: 4, class: "form-control"}
+                            .input-group-append
+                              %button{type: "button", class: "btn btn-outline-secondary", id: "browse-yaml-btn", "data-toggle": "modal", "data-target": "#yamlFilesModal"}
+                                %i.fas.fa-folder-open
+                                Browse
+                          %small.text-muted Enter file names, one per line. Files should be in the yass/ directory.
+                        .btn-group{role: "group"}
+                          %button{type: "submit", class: "btn btn-success"}
+                            %i.fas.fa-upload
+                            Load YAML Files
+                          %button{type: "button", class: "btn btn-warning", id: "validate-yaml-files-btn"}
+                            %i.fas.fa-check-circle
+                            Validate Files
+                    .col-md-6
+                      .alert.alert-info
+                        %h6 
+                          %i.fas.fa-info-circle
+                          Batch Loading
+                        %p.mb-0 Load multiple YAML files at once. Enter one filename per line, or use the Browse button to select from available files.
+              
+              / Tab 3: Raw YAML
+              .tab-pane.fade{id: "raw-yaml-panel", role: "tabpanel"}
+                .mt-3.raw-yaml-container
+                  .row.h-100
+                    .col-md-9.d-flex.flex-column
+                      %form#yaml-raw-form.h-100.d-flex.flex-column
+                        .form-group.flex-grow-1.d-flex.flex-column
+                          .lined-textarea-container.raw-yaml-textarea.flex-grow-1
+                            .line-numbers#line-numbers 1
+                            %textarea{name: "yaml_content", id: "yaml-content-textarea", placeholder: "metadata:\n  context: 'Test Data'\ndata:\n  facilities:\n    - factory: facility\n      attributes:\n        name: 'Test Facility'", class: "lined-textarea"}
+                          %small.text-muted.mt-2 Paste YAML content directly
+                        .btn-group.mt-3{role: "group"}
+                          %button{type: "submit", class: "btn btn-success"}
+                            %i.fas.fa-upload
+                            Load Raw YAML
+                          %button{type: "button", class: "btn btn-warning", id: "validate-raw-yaml-btn"}
+                            %i.fas.fa-check-circle
+                            Validate YAML
+                    .col-md-3
+                      .alert.alert-info
+                        %h6 
+                          %i.fas.fa-code
+                          Raw YAML
+                        %p.mb-0.small Paste YAML content directly for immediate loading. Useful for testing small configurations or when files aren't available in the yass/ directory.
+
+/ YAML Files Browser Modal
+#yamlFilesModal.modal.fade{tabindex: "-1", role: "dialog", "aria-labelledby": "yamlFilesModalLabel", "aria-hidden": "true"}
+  .modal-dialog.modal-lg{role: "document"}
+    .modal-content
+      .modal-header
+        %h5#yamlFilesModalLabel.modal-title
+          %i.fas.fa-folder-open
+          Browse YAML Files
+        %button{type: "button", class: "close", "data-dismiss": "modal", "aria-label": "Close"}
+          %span{"aria-hidden": "true"} &times;
+      .modal-body
+        #yaml-files-loading.text-center{style: "display: none;"}
+          %i.fas.fa-spinner.fa-spin
+          Loading YAML files...
+        #yaml-files-error.alert.alert-danger{style: "display: none;"}
+        #yaml-files-list
+          %p.text-muted Click a file to add it to your selection
+      .modal-footer
+        %button{type: "button", class: "btn btn-secondary", "data-dismiss": "modal"} Close
+
+/ File Info Modal
+#fileInfoModal.modal.fade{tabindex: "-1", role: "dialog", "aria-labelledby": "fileInfoModalLabel", "aria-hidden": "true"}
+  .modal-dialog.modal-md{role: "document"}
+    .modal-content
+      .modal-header
+        %h5#fileInfoModalLabel.modal-title
+          %i.fas.fa-info-circle
+          File Information
+        %button{type: "button", class: "close", "data-dismiss": "modal", "aria-label": "Close"}
+          %span{"aria-hidden": "true"} &times;
+      .modal-body
+        %div#file-info-content
+      .modal-footer
+        %button{type: "button", class: "btn btn-secondary", "data-dismiss": "modal"} Close
+
+/ Loading Result Modal
+#resultModal.modal.fade{tabindex: "-1", role: "dialog", "aria-labelledby": "resultModalLabel", "aria-hidden": "true"}
+  .modal-dialog.modal-lg{role: "document"}
+    .modal-content
+      .modal-header
+        %h5#resultModalLabel.modal-title
+          %i.fas.fa-info-circle
+          Operation Result
+        %button{type: "button", class: "close", "data-dismiss": "modal", "aria-label": "Close"}
+          %span{"aria-hidden": "true"} &times;
+      .modal-body
+        %div#result-content
+      .modal-footer
+        %button{type: "button", class: "btn btn-primary", "data-dismiss": "modal"} Close
+
+:javascript
+  document.addEventListener('DOMContentLoaded', function() {
+    // Load file list on startup
+    loadYamlFilesMain();
+    
+    // Handle tab switching to load file list when batch tab is used
+    $(document).on('shown.bs.tab', '#batch-yaml-tab', function (e) {
+      loadYamlFilesMain();
+    });
+
+    // Handle YAML files form
+    document.getElementById('yaml-files-form').addEventListener('submit', handleYamlFilesSubmit);
+
+    // Handle raw YAML form  
+    document.getElementById('yaml-raw-form').addEventListener('submit', handleYamlRawSubmit);
+
+    // Handle YAML files browser modal
+    document.getElementById('browse-yaml-btn').addEventListener('click', function(e) {
+      loadYamlFilesList();
+    });
+
+    // Handle search functionality
+    document.getElementById('file-search').addEventListener('input', function(e) {
+      filterYamlFiles(e.target.value);
+    });
+
+    // Handle validate files button
+    document.getElementById('validate-yaml-files-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      const form = document.getElementById('yaml-files-form');
+      const formData = new FormData(form);
+      const files = formData.get('files').split('\n').filter(f => f.trim());
+      
+      if (files.length === 0) {
+        showError({ message: 'No files specified for validation' });
+        return;
+      }
+      
+      validateYamlFiles(files);
+    });
+
+    // Handle validate raw YAML button
+    document.getElementById('validate-raw-yaml-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      const textarea = document.getElementById('yaml-content-textarea');
+      const yamlContent = textarea.value;
+      
+      if (!yamlContent.trim()) {
+        showError({ message: 'No YAML content provided for validation' });
+        return;
+      }
+      
+      validateRawYaml(yamlContent);
+    });
+
+    function loadYamlFilesMain() {
+      const container = document.getElementById('yaml-files-container');
+      if (!container) return;
+      
+      fetch('#{yass.data_seeding_path}/list_yaml_files')
+        .then(response => response.json())
+        .then(data => {
+          if (data.files && data.files.length > 0) {
+            renderYamlFilesMain(data.files);
+            window.allYamlFiles = data.files; // Store for search filtering
+          } else {
+            container.innerHTML = '<p class="text-muted">No YAML files found in the yass/ directory</p>';
+          }
+        })
+        .catch(error => {
+          container.innerHTML = '<div class="alert alert-danger">Error loading YAML files: ' + error.message + '</div>';
+        });
+    }
+
+    function renderYamlFilesMain(files) {
+      const container = document.getElementById('yaml-files-container');
+      
+      let html = '<div class="table-responsive"><table class="table table-hover table-sm">';
+      html += '<thead><tr><th style="width: 320px;">Actions</th><th style="width: 120px;">Path</th><th>File</th><th style="width: 120px;">Size</th><th style="width: 50px;">Info</th></tr></thead>';
+      html += '<tbody>';
+      
+      files.forEach(file => {
+        // Extract directory path from file.path (which is already relative to yass/)
+        const pathParts = file.path.split('/');
+        let pathFromYass = '';
+        if (pathParts.length > 1) {
+          // Get all parts except the filename
+          pathFromYass = pathParts.slice(0, -1).join('/') + '/';
+        }
+        
+        html += `
+          <tr class="yaml-file-main-item" data-file-path="${file.path}" data-file-name="${file.name}">
+            <td>
+              <div class="btn-group" role="group">
+                <button class="btn btn-success btn-sm run-single-file-btn mr-1" data-file-path="${file.path}">
+                  <i class="fas fa-play"></i>
+                  Run
+                </button>
+                <button class="btn btn-warning btn-sm validate-single-file-btn mr-1" data-file-path="${file.path}">
+                  <i class="fas fa-check-circle"></i>
+                  Validate
+                </button>
+                <button class="btn btn-info btn-sm copy-to-raw-btn" data-file-path="${file.path}">
+                  <i class="fas fa-copy"></i>
+                  View Raw
+                </button>
+              </div>
+            </td>
+            <td>
+              <span class="font-weight-medium">${pathFromYass}</span>
+            </td>
+            <td>
+              <span class="font-weight-medium">${file.name}</span>
+            </td>
+            <td>
+              <small class="text-muted">${file.size_formatted}</small>
+            </td>
+            <td>
+              <button class="btn btn-outline-info btn-sm info-btn" data-file-path="${file.path}" title="View file info">
+                <i class="fas fa-info-circle"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      html += '</tbody></table></div>';
+      
+      container.innerHTML = html;
+      
+      // Add click event listeners to run buttons
+      document.querySelectorAll('.run-single-file-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const filePath = this.getAttribute('data-file-path');
+          runSingleYamlFile(filePath);
+        });
+      });
+      
+      // Add click event listeners to validate buttons
+      document.querySelectorAll('.validate-single-file-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const filePath = this.getAttribute('data-file-path');
+          validateSingleYamlFile(filePath);
+        });
+      });
+      
+      // Add click event listeners to copy to raw buttons
+      document.querySelectorAll('.copy-to-raw-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const filePath = this.getAttribute('data-file-path');
+          copyFileToRawTab(filePath);
+        });
+      });
+      
+      // Add click event listeners to info buttons
+      document.querySelectorAll('.info-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const filePath = this.getAttribute('data-file-path');
+          showFileInfo(filePath);
+        });
+      });
+    }
+
+    function showFileInfo(filePath) {
+      // Show loading state on the button
+      const button = document.querySelector(`[data-file-path="${filePath}"] .info-btn`);
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      button.disabled = true;
+      
+      // Fetch file content
+      fetch(`#{yass.data_seeding_path}/get_yaml_file_content?file_path=${encodeURIComponent(filePath)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.content) {
+            try {
+              // Parse YAML content
+              const yamlData = jsyaml.load(data.content);
+              
+              // Count objects in data section
+              const objectCounts = {};
+              if (yamlData && yamlData.data) {
+                Object.keys(yamlData.data).forEach(key => {
+                  const items = yamlData.data[key];
+                  if (Array.isArray(items)) {
+                    objectCounts[key] = items.length;
+                  } else {
+                    objectCounts[key] = 1;
+                  }
+                });
+              }
+              
+              // Show info modal
+              showFileInfoModal(filePath, objectCounts, yamlData.metadata);
+            } catch (error) {
+              showError({ message: 'Error parsing YAML file: ' + error.message });
+            }
+          } else {
+            showError({ message: 'No content received from file' });
+          }
+        })
+        .catch(error => {
+          showError(error);
+        })
+        .finally(() => {
+          // Reset button state
+          button.innerHTML = originalContent;
+          button.disabled = false;
+        });
+    }
+
+    function showFileInfoModal(filePath, objectCounts, metadata) {
+      const modalTitle = document.getElementById('fileInfoModalLabel');
+      const modalContent = document.getElementById('file-info-content');
+      
+      const fileName = filePath.split('/').pop();
+      modalTitle.innerHTML = `<i class="fas fa-info-circle"></i> ${fileName}`;
+      
+      let content = `<div class="mb-3">`;
+      content += `<h6><i class="fas fa-file text-primary"></i> File Details</h6>`;
+      content += `<p class="mb-1"><strong>Path:</strong> <code>${filePath}</code></p>`;
+      
+      if (metadata) {
+        if (metadata.context) {
+          content += `<p class="mb-1"><strong>Context:</strong> ${metadata.context}</p>`;
+        }
+        if (metadata.description) {
+          content += `<p class="mb-1"><strong>Description:</strong> ${metadata.description}</p>`;
+        }
+      }
+      content += `</div>`;
+      
+      if (Object.keys(objectCounts).length > 0) {
+        content += `<div class="mb-3">`;
+        content += `<h6><i class="fas fa-database text-success"></i> Contents</h6>`;
+        
+        // Calculate average count for scaling
+        const counts = Object.values(objectCounts);
+        const totalObjects = counts.reduce((sum, count) => sum + count, 0);
+        const averageCount = totalObjects / counts.length;
+        
+        // Sort entries by count (descending), then alphabetically by object type
+        const sortedEntries = Object.entries(objectCounts).sort(([a, countA], [b, countB]) => {
+          if (countB !== countA) return countB - countA; // Sort by count descending
+          return a.localeCompare(b); // Then alphabetically
+        });
+        
+        content += `<div class="d-flex flex-wrap" style="gap: 0.5rem;">`;
+        
+        sortedEntries.forEach(([objectType, count]) => {
+          // Calculate scale factor (1.0 to 2.0 based on count relative to average)
+          const scaleFactor = Math.min(2.0, Math.max(1.0, count / averageCount));
+          const fontSize = (0.75 * scaleFactor).toFixed(2); // Base badge font-size is 0.75em
+          
+          // Humanize the object type name
+          let humanizedType = objectType
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          
+          // Singularize if count is 1
+          if (count === 1) {
+            // Simple singularization rules
+            if (humanizedType.endsWith('ies')) {
+              humanizedType = humanizedType.slice(0, -3) + 'y';
+            } else if (humanizedType.endsWith('ves')) {
+              humanizedType = humanizedType.slice(0, -3) + 'f';
+            } else if (humanizedType.endsWith('ses') || humanizedType.endsWith('ches') || humanizedType.endsWith('shes')) {
+              humanizedType = humanizedType.slice(0, -2);
+            } else if (humanizedType.endsWith('s') && !humanizedType.endsWith('ss')) {
+              humanizedType = humanizedType.slice(0, -1);
+            }
+          }
+          
+          // Create label with count and humanized type
+          const label = `${count} ${humanizedType}`;
+          
+          content += `<span class="badge badge-info" `;
+          content += `style="font-size: ${fontSize}em; align-self: flex-start;" `;
+          content += `title="${count} object${count !== 1 ? 's' : ''}">`;
+          content += `${label}`;
+          content += `</span>`;
+        });
+        
+        content += `</div>`;
+        
+        content += `<div class="mt-2 pt-2 border-top">`;
+        content += `<strong>Total Objects: ${totalObjects}</strong>`;
+        content += `</div>`;
+        content += `</div>`;
+      } else {
+        content += `<div class="alert alert-warning">`;
+        content += `<i class="fas fa-exclamation-triangle"></i> No data objects found in this file.`;
+        content += `</div>`;
+      }
+      
+      modalContent.innerHTML = content;
+      
+      // Initialize tooltips for the badges
+      setTimeout(() => {
+        $('[data-toggle="tooltip"]').tooltip();
+      }, 100);
+      
+      $('#fileInfoModal').modal('show');
+    }
+
+    function copyFileToRawTab(filePath) {
+      // Show loading state on the button
+      const button = document.querySelector(`[data-file-path="${filePath}"] .copy-to-raw-btn`);
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+      button.disabled = true;
+      
+      // Fetch file content
+      fetch(`#{yass.data_seeding_path}/get_yaml_file_content?file_path=${encodeURIComponent(filePath)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.content) {
+            // Switch to Raw YAML tab
+            $('#raw-yaml-tab').tab('show');
+            
+            // Populate the textarea with file content
+            setTimeout(() => {
+              const rawYamlTextarea = document.querySelector('#raw-yaml-panel textarea[name="yaml_content"]');
+              if (rawYamlTextarea) {
+                rawYamlTextarea.value = data.content;
+                // Focus on the textarea and scroll to top
+                rawYamlTextarea.focus();
+                rawYamlTextarea.scrollTop = 0;
+              }
+            }, 100); // Small delay to ensure tab switch completes
+            
+            // Show success feedback
+            showCopySuccessMessage(filePath);
+          } else {
+            showError({ message: 'No content received from file' });
+          }
+        })
+        .catch(error => {
+          showError(error);
+        })
+        .finally(() => {
+          // Reset button state
+          button.innerHTML = originalContent;
+          button.disabled = false;
+        });
+    }
+
+    function showCopySuccessMessage(filePath) {
+      // Create a temporary success message
+      const fileName = filePath.split('/').pop();
+      const message = `File "${fileName}" copied to Raw YAML tab for editing`;
+      
+      // You could show this in a toast notification or in the result modal
+      // For now, we'll use a simple temporary alert
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+      alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+      alertDiv.innerHTML = `
+        <i class="fas fa-check-circle"></i> ${message}
+        <button type="button" class="close" data-dismiss="alert">
+          <span>&times;</span>
+        </button>
+      `;
+      
+      document.body.appendChild(alertDiv);
+      
+      // Auto-remove after 3 seconds
+      setTimeout(() => {
+        if (alertDiv.parentNode) {
+          alertDiv.parentNode.removeChild(alertDiv);
+        }
+      }, 3000);
+    }
+
+    function filterYamlFiles(searchTerm) {
+      if (!window.allYamlFiles) return;
+      
+      const filteredFiles = window.allYamlFiles.filter(file => 
+        file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        file.path.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      
+      renderYamlFilesMain(filteredFiles);
+    }
+
+    function runSingleYamlFile(filePath) {
+      // Show loading state on the button
+      const button = document.querySelector(`[data-file-path="${filePath}"] .run-single-file-btn`);
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+      button.disabled = true;
+      
+      fetch('#{yass.data_seeding_path}/load_yaml', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ files: [filePath] })
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => {
+        showResult(data);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      })
+      .catch(error => {
+        showError(error);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      });
+    }
+
+    function validateSingleYamlFile(filePath) {
+      // Show loading state on the button
+      const button = document.querySelector(`[data-file-path="${filePath}"] .validate-single-file-btn`);
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+      button.disabled = true;
+      
+      fetch('#{yass.data_seeding_path}/validate_yaml', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ files: [filePath] })
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => {
+        showValidationResult(data);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      })
+      .catch(error => {
+        showError(error);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      });
+    }
+
+    function validateYamlFiles(files) {
+      // Show loading state
+      const button = document.getElementById('validate-yaml-files-btn');
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+      button.disabled = true;
+      
+      fetch('#{yass.data_seeding_path}/validate_yaml', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ files: files })
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => {
+        showValidationResult(data);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      })
+      .catch(error => {
+        showError(error);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      });
+    }
+
+    function validateRawYaml(yamlContent) {
+      // Show loading state
+      const button = document.getElementById('validate-raw-yaml-btn');
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+      button.disabled = true;
+      
+      fetch('#{yass.data_seeding_path}/validate_yaml_raw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: yamlContent
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => {
+        showValidationResult(data);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      })
+      .catch(error => {
+        showError(error);
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      });
+    }
+
+    function showValidationResult(data) {
+      const modalTitle = document.getElementById('resultModalLabel');
+      const modalContent = document.getElementById('result-content');
+      
+      if (data._responseOk) {
+        modalTitle.innerHTML = '<i class="fas fa-check-circle text-success"></i> Validation Successful';
+        
+        let content = `<div class="alert alert-success">${data.message}</div>`;
+        
+        if (data.results && data.results.length > 0) {
+          // Multiple files validation
+          content += '<h5>Validation Results</h5>';
+          content += '<div class="list-group">';
+          data.results.forEach(result => {
+            content += `
+              <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                  <h6 class="mb-1"><i class="fas fa-file text-primary"></i> ${result.file}</h6>
+                  <span class="badge badge-success">Valid</span>
+                </div>
+                <p class="mb-1"><strong>Objects validated:</strong> ${result.objects_validated}</p>
+                <div class="mt-2">
+                  <h6>Object Types:</h6>
+                  <div class="row">`;
+          
+          Object.entries(result.summary).forEach(([className, count]) => {
+            content += `<div class="col-auto"><span class="badge badge-info">${className}: ${count}</span></div>`;
+          });
+          
+          content += `
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+          content += '</div>';
+        } else {
+          // Single file or raw YAML validation
+          content += `<p><strong>Objects validated:</strong> ${data.objects_validated || 0}</p>`;
+          
+          if (data.summary && Object.keys(data.summary).length > 0) {
+            content += '<h5>Object Types Validated</h5>';
+            content += '<div class="row">';
+            Object.entries(data.summary).forEach(([className, count]) => {
+              content += `<div class="col-auto mb-2"><span class="badge badge-info">${className}: ${count}</span></div>`;
+            });
+            content += '</div>';
+          }
+        }
+        
+        modalContent.innerHTML = content;
+      } else {
+        modalTitle.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Validation Failed';
+        
+        let content = `<div class="alert alert-warning">${data.message}</div>`;
+        
+        if (data.user_friendly_message) {
+          content += `<div class="alert alert-info">${data.user_friendly_message}</div>`;
+        }
+        
+        if (data.suggestions && data.suggestions.length > 0) {
+          content += '<h5>Suggestions</h5><ul>';
+          data.suggestions.forEach(suggestion => {
+            content += `<li>${suggestion}</li>`;
+          });
+          content += '</ul>';
+        }
+        
+        modalContent.innerHTML = content;
+      }
+      
+      $('#resultModal').modal('show');
+    }
+
+    function loadYamlFilesList() {
+      const loadingDiv = document.getElementById('yaml-files-loading');
+      const errorDiv = document.getElementById('yaml-files-error');
+      const listDiv = document.getElementById('yaml-files-list');
+      
+      // Show loading state
+      loadingDiv.style.display = 'block';
+      errorDiv.style.display = 'none';
+      listDiv.innerHTML = '';
+      
+      fetch('#{yass.data_seeding_path}/list_yaml_files')
+        .then(response => response.json())
+        .then(data => {
+          loadingDiv.style.display = 'none';
+          
+          if (data.files && data.files.length > 0) {
+            renderYamlFilesList(data.files);
+          } else {
+            listDiv.innerHTML = '<p class="text-muted">No YAML files found in the yass/ directory</p>';
+          }
+        })
+        .catch(error => {
+          loadingDiv.style.display = 'none';
+          errorDiv.textContent = 'Error loading YAML files: ' + error.message;
+          errorDiv.style.display = 'block';
+        });
+    }
+
+    function renderYamlFilesList(files) {
+      const listDiv = document.getElementById('yaml-files-list');
+      
+      let html = '<div class="list-group">';
+      files.forEach(file => {
+        html += `
+          <a href="#" class="list-group-item list-group-item-action yaml-file-item" data-file-path="${file.path}">
+            <div class="d-flex w-100 justify-content-between">
+              <h6 class="mb-1">${file.name}</h6>
+              <small class="text-muted">${file.size_formatted}</small>
+            </div>
+            <p class="mb-1"><small class="text-muted">${file.path}</small></p>
+            <small class="text-muted">Modified ${file.modified_at_formatted}</small>
+          </a>
+        `;
+      });
+      html += '</div>';
+      
+      listDiv.innerHTML = html;
+      
+      // Add click event listeners to file items
+      document.querySelectorAll('.yaml-file-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+          e.preventDefault();
+          const filePath = this.getAttribute('data-file-path');
+          addFileToSelection(filePath);
+          // Close the modal
+          $('#yamlFilesModal').modal('hide');
+        });
+      });
+    }
+
+    function addFileToSelection(filePath) {
+      const textarea = document.querySelector('#yaml-files-form textarea[name="files"]');
+      const currentFiles = textarea.value.trim();
+      
+      // Check if file is already in the list
+      const fileList = currentFiles ? currentFiles.split('\n').map(f => f.trim()) : [];
+      if (!fileList.includes(filePath)) {
+        const newFiles = fileList.concat([filePath]).join('\n');
+        textarea.value = newFiles;
+      }
+    }
+
+    function handleYamlFilesSubmit(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const files = formData.get('files').split('\n').filter(f => f.trim());
+      
+      fetch('#{yass.data_seeding_path}/load_yaml', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ files: files })
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => showResult(data))
+      .catch(error => showError(error));
+    }
+
+    function handleYamlRawSubmit(e) {
+      e.preventDefault();
+      
+      const textarea = document.getElementById('yaml-content-textarea');
+      const yamlContent = textarea.value;
+      
+      fetch('#{yass.data_seeding_path}/load_yaml_raw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: yamlContent
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => showResult(data))
+      .catch(error => showError(error));
+    }
+
+    function showResult(data) {
+      const resultContent = document.getElementById('result-content');
+      const modalTitle = document.getElementById('resultModalLabel');
+      const modal = document.getElementById('resultModal');
+      
+      // Check if this is an error response based on status code or error indicators
+      const isError = (data._responseStatus && data._responseStatus >= 400) || 
+                     data.error || 
+                     data.user_friendly_message || 
+                     data.error_type ||
+                     (data._responseOk === false);
+      
+      if (isError) {
+        modalTitle.innerHTML = `
+          <i class="fas fa-exclamation-triangle text-danger"></i>
+          YAML Loading Error
+        `;
+        
+        let errorContent = `<div class="alert alert-danger">`;
+        
+        // Parse the user_friendly_message to extract structured information
+        let fileName = '';
+        let lineNumber = '';
+        let problemDescription = '';
+        
+        if (data.user_friendly_message) {
+          const message = data.user_friendly_message;
+          
+          // Extract file name
+          const fileMatch = message.match(/📄 File: (.+)/);
+          if (fileMatch) fileName = fileMatch[1].trim();
+          
+          // Extract line number
+          const lineMatch = message.match(/📍 Location: (.+)/);
+          if (lineMatch) lineNumber = lineMatch[1].trim();
+          
+          // Extract problem description
+          const problemMatch = message.match(/🔍 Problem: (.+?)(?=\n\n|$)/s);
+          if (problemMatch) problemDescription = problemMatch[1].trim();
+        }
+        
+        // Fallback to basic message if parsing fails
+        if (!problemDescription) {
+          problemDescription = data.message || 'Unknown error occurred';
+        }
+        
+        // File information section
+        if (fileName || lineNumber) {
+          errorContent += `<div class="mb-3">`;
+          errorContent += `<h6><i class="fas fa-file-alt text-primary"></i> File Information</h6>`;
+          if (fileName) {
+            errorContent += `<p class="mb-1"><strong>File:</strong> <code>${fileName}</code></p>`;
+          }
+          if (lineNumber) {
+            errorContent += `<p class="mb-1"><strong>Location:</strong> ${lineNumber}</p>`;
+          }
+          errorContent += `</div>`;
+        }
+        
+        // Problem description
+        errorContent += `<div class="mb-3">`;
+        errorContent += `<h6><i class="fas fa-exclamation-circle text-danger"></i> What went wrong</h6>`;
+        errorContent += `<p class="mb-0">${problemDescription}</p>`;
+        errorContent += `</div>`;
+        
+        // Error type if available
+        if (data.error_type) {
+          errorContent += `<div class="mb-3">`;
+          errorContent += `<p class="mb-0"><strong>Error Type:</strong> <span class="badge badge-secondary">${data.error_type}</span></p>`;
+          errorContent += `</div>`;
+        }
+        
+        // Suggestions section
+        if (data.suggestions && Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+          errorContent += `<div class="border-top pt-3">`;
+          errorContent += `<h6><i class="fas fa-lightbulb text-warning"></i> How to fix this</h6>`;
+          errorContent += `<ul class="mb-0">`;
+          data.suggestions.forEach(suggestion => {
+            errorContent += `<li>${suggestion}</li>`;
+          });
+          errorContent += `</ul>`;
+          errorContent += `</div>`;
+        }
+        
+        errorContent += `</div>`;
+        resultContent.innerHTML = errorContent;
+      } else if (data.message) {
+        modalTitle.innerHTML = `
+          <i class="fas fa-check-circle text-success"></i>
+          Success
+        `;
+        resultContent.innerHTML = `
+          <div class="alert alert-success">
+            <h6>${data.message}</h6>
+            ${data.objects_created ? `<p>Objects created: ${data.objects_created}</p>` : ''}
+            ${data.summary ? `<pre>${JSON.stringify(data.summary, null, 2)}</pre>` : ''}
+          </div>
+        `;
+      } else {
+        modalTitle.innerHTML = `
+          <i class="fas fa-question-circle text-warning"></i>
+          Unknown Response
+        `;
+        resultContent.innerHTML = `
+          <div class="alert alert-warning">
+            <h6>Unknown Response</h6>
+            <p>Received an unexpected response format.</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          </div>
+        `;
+      }
+      
+      $('#resultModal').modal('show');
+    }
+
+    function showError(error) {
+      const resultContent = document.getElementById('result-content');
+      const modalTitle = document.getElementById('resultModalLabel');
+      
+      modalTitle.innerHTML = `
+        <i class="fas fa-exclamation-triangle text-danger"></i>
+        Network Error
+      `;
+      resultContent.innerHTML = `
+        <div class="alert alert-danger">
+          <h6>Network Error</h6>
+          <p>${error.message}</p>
+        </div>
+      `;
+      
+      $('#resultModal').modal('show');
+    }
+
+    // Initialize line numbers for Raw YAML textarea
+    function initializeLineNumbers() {
+      const textarea = document.getElementById('yaml-content-textarea');
+      const lineNumbers = document.getElementById('line-numbers');
+      
+      if (!textarea || !lineNumbers) return;
+      
+      function updateLineNumbers() {
+        const content = textarea.value || textarea.placeholder || '';
+        const lines = content.split('\n');
+        const lineCount = Math.max(lines.length, 1); // Always show at least line 1
+        
+        let lineNumbersText = '';
+        for (let i = 1; i <= lineCount; i++) {
+          lineNumbersText += i + (i < lineCount ? '\n' : '');
+        }
+        
+        lineNumbers.textContent = lineNumbersText;
+      }
+      
+      function syncScroll() {
+        lineNumbers.scrollTop = textarea.scrollTop;
+      }
+      
+      // Update line numbers on input
+      textarea.addEventListener('input', updateLineNumbers);
+      textarea.addEventListener('keydown', function(e) {
+        // Update line numbers after a slight delay for key events that change content
+        setTimeout(updateLineNumbers, 10);
+      });
+      textarea.addEventListener('paste', function(e) {
+        // Update line numbers after paste
+        setTimeout(updateLineNumbers, 10);
+      });
+      textarea.addEventListener('focus', updateLineNumbers);
+      textarea.addEventListener('blur', updateLineNumbers);
+      
+      // Sync scroll between textarea and line numbers
+      textarea.addEventListener('scroll', syncScroll);
+      
+      // Initialize line numbers immediately and with delay
+      updateLineNumbers();
+      setTimeout(updateLineNumbers, 100);
+      
+      return { updateLineNumbers, syncScroll };
+    }
+
+    // Global reference to line number functions
+    window.yamlLineNumbers = null;
+
+    // Initialize line numbers when the page loads
+    window.yamlLineNumbers = initializeLineNumbers();
+
+    // Re-initialize line numbers when Raw YAML tab is shown
+    $(document).on('shown.bs.tab', '#raw-yaml-tab', function (e) {
+      setTimeout(function() {
+        if (window.yamlLineNumbers) {
+          window.yamlLineNumbers.updateLineNumbers();
+        } else {
+          window.yamlLineNumbers = initializeLineNumbers();
+        }
+      }, 50);
+    });
+  });
