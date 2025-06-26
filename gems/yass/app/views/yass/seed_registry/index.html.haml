@@ -177,7 +177,7 @@
     if (cleanBtn) {
       cleanBtn.addEventListener('click', function() {
         if (confirm('Are you sure you want to clean orphaned entries? This will permanently delete registry entries for objects that no longer exist.')) {
-          fetch('#{clean_orphaned_seed_registry_path}', {
+          fetch('#{clean_orphaned_seed_registry_index_path}', {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json'
