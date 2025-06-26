@@ -292,7 +292,7 @@
       const container = document.getElementById('yaml-files-container');
       if (!container) return;
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/list_yaml_files')
+      fetch('#{data_seeding_path}/list_yaml_files')
         .then(response => response.json())
         .then(data => {
           if (data.files && data.files.length > 0) {
@@ -407,7 +407,7 @@
       button.disabled = true;
       
       // Fetch file content
-      fetch(`#{main_app.yass_engine.data_seeding_path}/get_yaml_file_content?file_path=${encodeURIComponent(filePath)}`)
+      fetch(`#{data_seeding_path}/get_yaml_file_content?file_path=${encodeURIComponent(filePath)}`)
         .then(response => response.json())
         .then(data => {
           if (data.content) {
@@ -550,7 +550,7 @@
       button.disabled = true;
       
       // Fetch file content
-      fetch(`#{main_app.yass_engine.data_seeding_path}/get_yaml_file_content?file_path=${encodeURIComponent(filePath)}`)
+      fetch(`#{data_seeding_path}/get_yaml_file_content?file_path=${encodeURIComponent(filePath)}`)
         .then(response => response.json())
         .then(data => {
           if (data.content) {
@@ -629,7 +629,7 @@
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
       button.disabled = true;
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/load_yaml', {
+      fetch('#{data_seeding_path}/load_yaml', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -664,7 +664,7 @@
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
       button.disabled = true;
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/validate_yaml', {
+      fetch('#{data_seeding_path}/validate_yaml', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -699,7 +699,7 @@
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
       button.disabled = true;
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/validate_yaml', {
+      fetch('#{data_seeding_path}/validate_yaml', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -734,7 +734,7 @@
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
       button.disabled = true;
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/validate_yaml_raw', {
+      fetch('#{data_seeding_path}/validate_yaml_raw', {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain'
@@ -846,7 +846,7 @@
       errorDiv.style.display = 'none';
       listDiv.innerHTML = '';
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/list_yaml_files')
+      fetch('#{data_seeding_path}/list_yaml_files')
         .then(response => response.json())
         .then(data => {
           loadingDiv.style.display = 'none';
@@ -914,7 +914,7 @@
       const formData = new FormData(e.target);
       const files = formData.get('files').split('\n').filter(f => f.trim());
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/load_yaml', {
+      fetch('#{data_seeding_path}/load_yaml', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -938,7 +938,7 @@
       const textarea = document.getElementById('yaml-content-textarea');
       const yamlContent = textarea.value;
       
-      fetch('#{main_app.yass_engine.data_seeding_path}/load_yaml_raw', {
+      fetch('#{data_seeding_path}/load_yaml_raw', {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain'

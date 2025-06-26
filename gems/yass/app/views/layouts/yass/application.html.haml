@@ -46,12 +46,12 @@
     / Navigation
     %nav.navbar.navbar-expand-lg.navbar-dark.bg-dark
       .container-fluid
-        = link_to (content_for?(:title) ? yield(:title) : "YASS"), main_app.yass_engine.root_path, class: "navbar-brand"
+        = link_to (content_for?(:title) ? yield(:title) : "YASS"), root_path, class: "navbar-brand"
         .navbar-nav.ml-auto
-          = link_to main_app.yass_engine.data_seeding_path, class: "nav-link btn btn-outline-light btn-sm ml-2" do
+          = link_to data_seeding_path, class: "nav-link btn btn-outline-light btn-sm ml-2" do
             %i.fas.fa-upload
             Data Seeding
-          = link_to main_app.yass_engine.seed_registry_path, class: "nav-link btn btn-outline-info btn-sm ml-2" do
+          = link_to seed_registry_path, class: "nav-link btn btn-outline-info btn-sm ml-2" do
             %i.fas.fa-list
             Seed Registry
 

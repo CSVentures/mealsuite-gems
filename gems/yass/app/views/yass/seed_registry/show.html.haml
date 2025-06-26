@@ -12,7 +12,7 @@
       %h4
         %i.fas.fa-database
         Registry Entry Details
-      = link_to main_app.yass_engine.seed_registry_path, class: 'btn btn-outline-secondary' do
+      = link_to seed_registry_path, class: 'btn btn-outline-secondary' do
         %i.fas.fa-arrow-left
         Back to Registry
 
@@ -178,7 +178,7 @@
     setInterval(function() {
       if (!#{@object_exists}) {
         // Only refresh if currently showing as orphaned
-        fetch('#{main_app.yass_engine.seed_registry_path(@entry)}.json')
+        fetch('#{seed_registry_path(@entry)}.json')
           .then(response => response.json())
           .then(data => {
             if (data.object_exists !== #{@object_exists}) {
