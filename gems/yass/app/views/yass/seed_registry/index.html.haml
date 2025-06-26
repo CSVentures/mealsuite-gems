@@ -29,7 +29,7 @@
             %span.stat-value= count
 
     .model-filter
-      = form_with url: seed_registry_path, method: :get, local: true do |f|
+      = form_with url: seed_registry_index_path, method: :get, local: true do |f|
         = f.hidden_field :search, value: @search_term
         = f.select :model_filter, 
           options_for_select([['All Models', 'all']] + @model_counts.map { |model, count| [model, model] }, @model_filter),
@@ -53,7 +53,7 @@
             Clean Orphaned
 
     .registry-search
-      = form_with url: seed_registry_path, method: :get, local: true do |f|
+      = form_with url: seed_registry_index_path, method: :get, local: true do |f|
         = f.hidden_field :model_filter, value: @model_filter
         .input-group
           = f.text_field :search, 
@@ -63,7 +63,7 @@
           .input-group-append
             = f.submit 'Search', class: 'btn btn-outline-secondary'
             - if @search_term.present?
-              = link_to 'Clear', seed_registry_path(model_filter: @model_filter), class: 'btn btn-outline-secondary'
+              = link_to 'Clear', seed_registry_index_path(model_filter: @model_filter), class: 'btn btn-outline-secondary'
 
     - if @entries.any?
       .table-responsive
@@ -109,10 +109,10 @@
           Showing #{@entries.count} of #{@total_count} entries
         - if @entries.count >= 50
           .btn-group
-            = link_to seed_registry_path(search: @search_term, model_filter: @model_filter, per_page: 100), 
+            = link_to seed_registry_index_path(search: @search_term, model_filter: @model_filter, per_page: 100), 
               class: 'btn btn-sm btn-outline-secondary' do
               Show 100
-            = link_to seed_registry_path(search: @search_term, model_filter: @model_filter, per_page: 500), 
+            = link_to seed_registry_index_path(search: @search_term, model_filter: @model_filter, per_page: 500), 
               class: 'btn btn-sm btn-outline-secondary' do
               Show 500
 
@@ -122,7 +122,7 @@
         No entries found
         - if @search_term.present? || (@model_filter.present? && @model_filter != 'all')
           matching your search criteria.
-          = link_to 'Show all entries', seed_registry_path, class: 'btn btn-sm btn-outline-primary ml-2'
+          = link_to 'Show all entries', seed_registry_index_path, class: 'btn btn-sm btn-outline-primary ml-2'
         - else
           in the registry. Load some YAML files to populate the registry.
 
