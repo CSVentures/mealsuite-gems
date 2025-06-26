@@ -50,7 +50,7 @@ module Yass
     end
 
     def show
-      @entry = SeedRegistryEntry.find(params[:id])
+      @entry = registry_model_class.find(params[:id])
       @object = @entry.get_object
       @object_exists = @entry.object_exists?
 
@@ -90,8 +90,8 @@ module Yass
     end
 
     def clean_orphaned
-      if SeedRegistryEntry.respond_to?(:clean_orphaned_entries!)
-        deleted_count = SeedRegistryEntry.clean_orphaned_entries!
+      if registry_model_class.respond_to?(:clean_orphaned_entries!)
+        deleted_count = registry_model_class.clean_orphaned_entries!
         render json: { 
           message: "Cleaned #{deleted_count} orphaned entries",
           deleted_count: deleted_count 
@@ -103,12 +103,16 @@ module Yass
 
     private
 
+    def registry_model_class
+      Yass.configuration.registry_model_class
+    end
+
     def base_query
-      if defined?(SeedRegistryEntry) && SeedRegistryEntry.table_exists?
-        SeedRegistryEntry.all
+      if registry_model_class && registry_model_class.table_exists?
+        registry_model_class.all
       else
         # Return empty relation if table doesn't exist
-        SeedRegistryEntry.none rescue []
+        registry_model_class&.none || []
       end
     end
 

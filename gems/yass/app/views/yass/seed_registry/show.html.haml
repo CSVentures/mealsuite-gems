@@ -178,7 +178,7 @@
     setInterval(function() {
       if (!#{@object_exists}) {
         // Only refresh if currently showing as orphaned
-        fetch('#{seed_registry_path(@entry)}.json')
+        fetch('#{seed_registry_path(@entry.id)}.json')
           .then(response => response.json())
           .then(data => {
             if (data.object_exists !== #{@object_exists}) {
