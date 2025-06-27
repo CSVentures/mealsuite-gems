@@ -41,7 +41,7 @@ Gem::Specification.new do |spec|
   # Dependencies
   spec.add_dependency 'factory_bot', '>= 4.0', '< 7.0'
   # Rails version should be inherited from the host application
-  spec.add_dependency 'sass-rails', '>= 5.0', '< 6.0'
+  # Remove sass-rails dependency to avoid conflicts
 
   # Development dependencies
   spec.add_development_dependency 'rspec', '~> 3.0'
