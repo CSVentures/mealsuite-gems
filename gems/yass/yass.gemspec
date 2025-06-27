@@ -39,10 +39,9 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
 
   # Dependencies
-  spec.add_dependency 'factory_bot', '>= 6.0'
-  spec.add_dependency 'rails', '>= 5.0'
-  spec.add_dependency 'haml-rails', '>= 2.0'
-  spec.add_dependency 'sass-rails', '>= 6.0'
+  spec.add_dependency 'factory_bot', '>= 4.0', '< 7.0'
+  spec.add_dependency 'rails', '>= 5.2.0', '< 6.0'
+  spec.add_dependency 'sass-rails', '>= 5.0', '< 6.0'
 
   # Development dependencies
   spec.add_development_dependency 'rspec', '~> 3.0'
