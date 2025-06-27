@@ -14,5 +14,11 @@ module Yass
         render plain: 'YASS interface is only available in development and test environments', status: :forbidden
       end
     end
+
+    # Override page_without_user? to always return true for YASS pages
+    # This bypasses the main application's authentication system
+    def page_without_user?
+      true
+    end
   end
 end
