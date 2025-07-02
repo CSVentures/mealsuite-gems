@@ -17,9 +17,6 @@
       .stat-item
         %span Total Entries: 
         %span.stat-value= @total_count
-      .stat-item
-        %span Orphaned: 
-        %span.stat-value.text-warning= @orphaned_count
       - if @model_counts.any?
         %hr
         %small.text-muted Model Types:
@@ -47,10 +44,6 @@
         %button.btn.btn-outline-secondary.btn-sm{data: {toggle: 'modal', target: '#statsModal'}}
           %i.fas.fa-info-circle
           Statistics
-        - if @orphaned_count > 0
-          %button.btn.btn-outline-warning.btn-sm#clean-orphaned-btn{title: "Clean #{@orphaned_count} orphaned entries"}
-            %i.fas.fa-broom
-            Clean Orphaned
 
     .registry-search
       = form_with url: seed_registry_index_path, method: :get, local: true do |f|
@@ -74,12 +67,10 @@
               %th Model
               %th Object ID
               %th Context
-              %th Object Preview
-              %th Status
               %th Actions
           %tbody
             - @entries.each do |entry|
-              %tr{class: (entry.object_exists? ? '' : 'orphaned-entry')}
+              %tr
                 %td
                   %code= entry.key
                 %td
@@ -87,17 +78,6 @@
                 %td= entry.object_id
                 %td
                   %small.text-muted= entry.context || 'Reference Data'
-                %td
-                  %small= truncate(entry.object_preview || 'N/A', length: 50)
-                %td
-                  - if entry.object_exists?
-                    %span.badge.badge-success
-                      %i.fas.fa-check
-                      Exists
-                  - else
-                    %span.badge.badge-warning
-                      %i.fas.fa-exclamation-triangle
-                      Orphaned
                 %td
                   = link_to seed_registry_path(entry.id), 
                     class: 'btn btn-sm btn-outline-primary',
@@ -144,15 +124,6 @@
               %tr
                 %td Total Entries:
                 %td.font-weight-bold= @total_count
-              %tr
-                %td Orphaned Entries:
-                %td.font-weight-bold.text-warning= @orphaned_count
-              %tr
-                %td Health Percentage:
-                %td.font-weight-bold
-                  - health = @total_count > 0 ? (((@total_count - @orphaned_count).to_f / @total_count) * 100).round(1) : 100
-                  %span{class: health >= 90 ? 'text-success' : (health >= 70 ? 'text-warning' : 'text-danger')}
-                    = "#{health}%"
 
           .col-md-6
             %h6 Model Distribution

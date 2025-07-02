@@ -34,7 +34,6 @@ module Yass
       # Get statistics for the sidebar
       @total_count = base_query.count
       @model_counts = base_query.group(:object_class).count.sort
-      @orphaned_count = calculate_orphaned_count
 
       respond_to do |format|
         format.html
@@ -42,8 +41,7 @@ module Yass
           render json: {
             entries: @entries.map { |entry| entry_json(entry) },
             total_count: @total_count,
-            model_counts: @model_counts,
-            orphaned_count: @orphaned_count
+            model_counts: @model_counts
           }
         end
       end
@@ -80,8 +78,7 @@ module Yass
         total_entries: base_query.count,
         model_counts: base_query.group(:object_class).count.sort,
         context_counts: base_query.group(:context).count.sort,
-        orphaned_count: calculate_orphaned_count,
-        recent_entries: base_query.order(created_at: :desc).limit(10).map { |entry| entry_json(entry) }
+        recent_entries: base_query.order(created_at: :desc).limit(10).map { |entry| entry_json_basic(entry) }
       }
 
       respond_to do |format|
@@ -130,17 +127,18 @@ module Yass
       }
     end
 
-    def calculate_orphaned_count
-      return 0 unless base_query.respond_to?(:count)
-      
-      orphaned = 0
-      base_query.find_each do |entry|
-        orphaned += 1 unless entry.object_exists?
-      end
-      orphaned
-    rescue
-      0
+    def entry_json_basic(entry)
+      {
+        id: entry.id,
+        key: entry.key,
+        object_class: entry.object_class,
+        object_id: entry.object_id,
+        description: entry.description,
+        context: entry.context,
+        created_at: entry.created_at
+      }
     end
+
 
     def get_useful_methods(object)
       return {} unless object
