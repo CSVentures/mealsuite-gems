@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Yass
-  class DataSeedingController < ApplicationController
+  class DataSeedingController < Yass::ApplicationController
     skip_before_action :verify_authenticity_token
     include ActionView::Helpers::DateHelper
     include ActionView::Helpers::NumberHelper

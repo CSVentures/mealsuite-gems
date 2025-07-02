@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Yass
-  class SeedRegistryController < ApplicationController
+  class SeedRegistryController < Yass::ApplicationController
     include ActionView::Helpers::NumberHelper
 
     def index
