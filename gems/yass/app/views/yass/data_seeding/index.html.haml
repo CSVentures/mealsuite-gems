@@ -74,6 +74,16 @@
     box-shadow: none;
   }
 
+  /* Spinning animation for in-progress status */
+  .fa-spinner {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
 / Environment status header
 .row.mb-3
   .col-12
@@ -92,9 +102,12 @@
           %br
           %strong Status: 
           %span#environment-status
-            %span.badge.badge-success.small
-              %i.fas.fa-check
-              Ready for YAML operations
+            %span.badge.small{class: "badge-#{@seed_configuration[:status_color]}"}
+              %i.fas{class: @seed_configuration[:status_icon]}
+              = @seed_configuration[:status]
+          %br
+          %strong Last Run: 
+          %span.small.text-muted= @seed_configuration[:last_run_formatted]
         .col-md-5.text-md-right
           %strong YASS Version: 
           %span.badge.badge-secondary= Yass::VERSION
@@ -108,7 +121,7 @@
       .card-body
         .row
           .col-md-12
-            / Three-tab navigation
+            / Four-tab navigation
             %ul.nav.nav-tabs{id: "yaml-tabs", role: "tablist"}
               %li.nav-item
                 %a.nav-link.active{id: "batch-yaml-tab", "data-toggle": "tab", href: "#batch-yaml-panel", role: "tab"} Load YAML Files
@@ -116,6 +129,8 @@
                 %a.nav-link{id: "file-list-tab", "data-toggle": "tab", href: "#file-list-panel", role: "tab"} Load File List
               %li.nav-item
                 %a.nav-link{id: "raw-yaml-tab", "data-toggle": "tab", href: "#raw-yaml-panel", role: "tab"} Raw YAML
+              %li.nav-item
+                %a.nav-link{id: "backup-restore-tab", "data-toggle": "tab", href: "#backup-restore-panel", role: "tab"} Backup/Restore
             
             .tab-content{id: "yaml-tab-content"}
               / Tab 1: Load YAML Files (individual files with run buttons)
@@ -182,6 +197,65 @@
                           %i.fas.fa-code
                           Raw YAML
                         %p.mb-0.small Paste YAML content directly for immediate loading. Useful for testing small configurations or when files aren't available in the yass/ directory.
+              
+              / Tab 4: Backup/Restore
+              .tab-pane.fade{id: "backup-restore-panel", role: "tabpanel"}
+                .mt-3
+                  .row
+                    .col-md-8
+                      .card
+                        .card-header
+                          %h6.mb-0
+                            %i.fas.fa-database
+                            Database Backup Information
+                        .card-body
+                          .row
+                            .col-md-6
+                              %strong Backup File:
+                              %p.mb-1
+                                %code db/seed.dump
+                              %strong Status:
+                              %p#backup-status.mb-1
+                                %i.fas.fa-spinner.fa-spin
+                                Loading...
+                            .col-md-6
+                              %strong File Size:
+                              %p#backup-size.mb-1 -
+                              %strong Last Modified:
+                              %p#backup-age.mb-1 -
+                      
+                      .card.mt-3
+                        .card-header
+                          %h6.mb-0
+                            %i.fas.fa-tools
+                            Backup Operations
+                        .card-body
+                          .row
+                            .col-md-6
+                              %h6 Create Backup
+                              %p.text-muted Create a new backup of the current database state
+                              %button#create-backup-btn.btn.btn-primary
+                                %i.fas.fa-download
+                                Create Backup
+                            .col-md-6
+                              %h6 Restore from Backup
+                              %p.text-muted Restore database from the existing backup file
+                              %button#restore-backup-btn.btn.btn-warning
+                                %i.fas.fa-upload
+                                Restore Backup
+                    .col-md-4
+                      .alert.alert-info
+                        %h6 
+                          %i.fas.fa-info-circle
+                          Backup/Restore
+                        %p.mb-2.small This feature allows you to create and restore database backups for seed data.
+                        %p.mb-2.small 
+                          %strong Create Backup:
+                          Saves the current database state to 
+                          %code db/seed.dump
+                        %p.mb-0.small 
+                          %strong Restore:
+                          Resets the database to the backup state. This will delete all current data!
 
 / YAML Files Browser Modal
 #yamlFilesModal.modal.fade{tabindex: "-1", role: "dialog", "aria-labelledby": "yamlFilesModalLabel", "aria-hidden": "true"}
@@ -238,9 +312,17 @@
     // Load file list on startup
     loadYamlFilesMain();
     
+    // Start periodic status refresh
+    startStatusRefresh();
+    
     // Handle tab switching to load file list when batch tab is used
     $(document).on('shown.bs.tab', '#batch-yaml-tab', function (e) {
       loadYamlFilesMain();
+    });
+
+    // Handle backup/restore tab switching
+    $(document).on('shown.bs.tab', '#backup-restore-tab', function (e) {
+      loadBackupInfo();
     });
 
     // Handle YAML files form
@@ -287,6 +369,10 @@
       
       validateRawYaml(yamlContent);
     });
+
+    // Handle backup/restore buttons
+    document.getElementById('create-backup-btn').addEventListener('click', handleCreateBackup);
+    document.getElementById('restore-backup-btn').addEventListener('click', handleRestoreBackup);
 
     function loadYamlFilesMain() {
       const container = document.getElementById('yaml-files-container');
@@ -1152,4 +1238,193 @@
         }
       }, 50);
     });
+
+    // Status refresh functionality
+    function startStatusRefresh() {
+      // Refresh every second
+      setInterval(function() {
+        refreshStatus();
+      }, 1000);
+    }
+
+    function refreshStatus() {
+      fetch('#{data_seeding_path}/status')
+        .then(response => response.json())
+        .then(data => {
+          updateStatusDisplay(data);
+        })
+        .catch(error => {
+          console.error('Error refreshing status:', error);
+        });
+    }
+
+    function updateStatusDisplay(data) {
+      const statusElement = document.getElementById('environment-status');
+      if (statusElement && data.status) {
+        // Determine icon and color based on status
+        const { icon, color } = getStatusIconAndColor(data.status);
+        
+        statusElement.innerHTML = `
+          <span class="badge badge-${color} small">
+            <i class="fas ${icon}"></i>
+            ${data.status}
+          </span>
+        `;
+      }
+      
+      // Update last run time if available
+      if (data.last_run_formatted) {
+        const statusContainer = statusElement.parentElement;
+        const lastRunElement = statusContainer.parentElement.querySelector('.text-muted');
+        if (lastRunElement) {
+          lastRunElement.textContent = data.last_run_formatted;
+        }
+      }
+    }
+
+    function getStatusIconAndColor(status) {
+      const statusLower = status.toLowerCase();
+      
+      // Green for complete/success states
+      if (statusLower.includes('complete') || statusLower.includes('success') || 
+          statusLower.includes('restored successfully')) {
+        return { icon: 'fa-check-circle', color: 'success' };
+      }
+      
+      // Red for error/failed states or uninitialized database
+      if (statusLower.includes('error') || statusLower.includes('failed') || 
+          statusLower.includes('not initialized') || statusLower.includes('being restored')) {
+        return { icon: 'fa-exclamation-triangle', color: 'danger' };
+      }
+      
+      // Yellow for in-progress/processing states
+      if (statusLower.includes('in_progress') || statusLower.includes('processing') || 
+          statusLower.includes('seeding') || statusLower.includes('populating') || 
+          statusLower.includes('removing') || statusLower.includes('truncating') || 
+          statusLower.includes('updating') || statusLower.includes('queued')) {
+        return { icon: 'fa-spinner', color: 'warning' };
+      }
+      
+      // Default to success for ready states
+      return { icon: 'fa-check', color: 'success' };
+    }
+
+    // Backup/Restore functionality
+    function loadBackupInfo() {
+      // Update status indicators
+      document.getElementById('backup-status').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+      document.getElementById('backup-size').textContent = '-';
+      document.getElementById('backup-age').textContent = '-';
+      
+      // Check backup file status via a simple HEAD request or backend endpoint
+      // For now, we'll use a placeholder implementation
+      setTimeout(function() {
+        // This would be replaced with an actual API call to check backup file status
+        checkBackupFileStatus();
+      }, 500);
+    }
+
+    function checkBackupFileStatus() {
+      fetch('#{data_seeding_path}/backup_info')
+        .then(response => response.json())
+        .then(data => {
+          if (data.exists) {
+            document.getElementById('backup-status').innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Available</span>';
+            document.getElementById('backup-size').textContent = data.size_formatted;
+            document.getElementById('backup-age').textContent = data.modified_at_formatted;
+          } else {
+            document.getElementById('backup-status').innerHTML = '<span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> No backup found</span>';
+            document.getElementById('backup-size').textContent = '-';
+            document.getElementById('backup-age').textContent = '-';
+          }
+        })
+        .catch(error => {
+          console.error('Error checking backup status:', error);
+          document.getElementById('backup-status').innerHTML = '<span class="badge badge-danger"><i class="fas fa-exclamation-circle"></i> Error loading backup info</span>';
+          document.getElementById('backup-size').textContent = '-';
+          document.getElementById('backup-age').textContent = '-';
+        });
+    }
+
+    function handleCreateBackup() {
+      if (!confirm('Create a new database backup? This will overwrite any existing backup file.')) {
+        return;
+      }
+
+      const button = document.getElementById('create-backup-btn');
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+      button.disabled = true;
+
+      fetch('#{data_seeding_path}/create_backup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => {
+        if (data._responseOk) {
+          showResult(data);
+          // Refresh backup info
+          loadBackupInfo();
+          // Refresh status to show backup creation
+          refreshStatus();
+        } else {
+          showResult(data);
+        }
+      })
+      .catch(error => {
+        showError(error);
+      })
+      .finally(() => {
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      });
+    }
+
+    function handleRestoreBackup() {
+      if (!confirm('Restore from backup? This will DELETE ALL CURRENT DATA and replace it with the backup. This action cannot be undone!')) {
+        return;
+      }
+
+      const button = document.getElementById('restore-backup-btn');
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
+      button.disabled = true;
+
+      fetch('#{data_seeding_path}/restore_backup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => {
+        showResult(data);
+        if (data._responseOk) {
+          // Refresh status to show restore progress
+          refreshStatus();
+        }
+      })
+      .catch(error => {
+        showError(error);
+      })
+      .finally(() => {
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      });
+    }
   });

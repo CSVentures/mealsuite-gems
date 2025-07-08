@@ -339,18 +339,97 @@ module Yass
       render json: { message: 'Static QA data seeding not implemented in YASS gem' }, status: :not_implemented
     end
 
+    def backup_info
+      backup_file_path = Rails.root.join('db', 'seed.dump')
+      
+      if File.exist?(backup_file_path)
+        file_stats = File.stat(backup_file_path)
+        
+        render json: {
+          exists: true,
+          size: file_stats.size,
+          size_formatted: number_to_human_size(file_stats.size),
+          modified_at: file_stats.mtime,
+          modified_at_formatted: time_ago_in_words(file_stats.mtime) + ' ago',
+          path: 'db/seed.dump'
+        }
+      else
+        render json: {
+          exists: false,
+          size: 0,
+          size_formatted: '-',
+          modified_at: nil,
+          modified_at_formatted: '-',
+          path: 'db/seed.dump'
+        }
+      end
+    rescue => e
+      Rails.logger.error "Error getting backup info: #{e.message}"
+      render json: { 
+        exists: false,
+        error: e.message,
+        size: 0,
+        size_formatted: '-',
+        modified_at: nil,
+        modified_at_formatted: '-',
+        path: 'db/seed.dump'
+      }, status: :unprocessable_entity
+    end
+
     def create_backup
-      # This would need to be implemented based on the host application's backup system  
-      render json: { message: 'Backup creation not implemented in YASS gem' }, status: :not_implemented
+      allowed = Rails.env.development? || Rails.env.test?
+    
+      disallowed_databases = %w[touch_production touch us_production ca_production us_staging ca_staging us_dev ca_dev]
+      current_db_name = ActiveRecord::Base.connection.current_database
+      allowed = allowed && disallowed_databases.exclude?(current_db_name)
+
+      if allowed
+        ActiveRecord::Base.connection.execute("UPDATE seed_configuration SET status = 'Backup Creation Queued', last_run = NOW() AT TIME ZONE 'UTC'")
+        Testing::CreateSeedDataBackupJob.perform_async
+
+        respond_to do |format|
+          format.json { render json: { message: 'Backup creation initiated successfully' }, status: :ok }
+        end
+      else
+        render json: { message: 'Backup creation not permitted for this environment' }, status: :forbidden
+      end
     end
 
     def restore_backup
-      # This would need to be implemented based on the host application's backup system
-      render json: { message: 'Backup restoration not implemented in YASS gem' }, status: :not_implemented
+      allowed = Rails.env.development? || Rails.env.test?
+    
+      disallowed_databases = %w[touch_production touch_staging touch_dev us_production ca_production us_staging ca_staging us_dev ca_dev]
+      current_db_name = ActiveRecord::Base.connection.current_database
+      allowed = allowed && disallowed_databases.exclude?(current_db_name)
+
+      if allowed
+        ActiveRecord::Base.connection.execute("UPDATE seed_configuration SET status = 'Backup Restore Queued', last_run = NOW() AT TIME ZONE 'UTC'")
+        Testing::ResetSeedDataFromBackupJob.perform_async
+
+        respond_to do |format|
+          format.json { render json: { message: 'Restore initiated successfully' }, status: :ok }
+        end
+      else
+        render json: { message: 'Data reseeding not permitted for this environment' }, status: :forbidden
+      end
     end
 
     def status
       get_seed_configuration
+      # Ensure timezone-aware formatting for AJAX requests
+      if @seed_configuration[:last_run_formatted] && @seed_configuration[:last_run_formatted] != 'N/A'
+        # Re-parse to ensure proper timezone handling for AJAX
+        begin
+          result = ActiveRecord::Base.connection.execute("SELECT last_run FROM seed_configuration ORDER BY last_run DESC LIMIT 1")
+          if result.any? && result.first['last_run']
+            time = Time.parse(result.first['last_run'].to_s + ' UTC').in_time_zone
+            @seed_configuration[:last_run_formatted] = time_ago_in_words(time) + ' ago'
+          end
+        rescue => e
+          Rails.logger.error "Error refreshing timezone for status: #{e.message}"
+        end
+      end
+      
       render json: @seed_configuration
     end
 
@@ -358,10 +437,67 @@ module Yass
 
     def get_seed_configuration
       # Try to get seed configuration from the host application if available
-      if defined?(SeedRegistryEntry) && SeedRegistryEntry.table_exists?
+      if seed_configuration_table_exists?
+        begin
+          # Query the seed_configuration table directly
+          result = ActiveRecord::Base.connection.execute("SELECT status, last_run FROM seed_configuration ORDER BY last_run DESC LIMIT 1")
+          
+          if result.any?
+            row = result.first
+            status = row['status'] || 'Unknown'
+            last_run = row['last_run']
+            
+            # Format the last run time
+            last_run_formatted = if last_run
+              begin
+                # Parse as UTC and convert to local time zone
+                time = Time.parse(last_run.to_s + ' UTC').in_time_zone
+                time_ago_in_words(time) + ' ago'
+              rescue
+                last_run.to_s
+              end
+            else
+              'N/A'
+            end
+            
+            # Determine status icon and color based on status content
+            status_icon, status_color = get_status_icon_and_color(status)
+            
+            @seed_configuration = {
+              status: status,
+              status_icon: status_icon,
+              status_color: status_color,
+              ready_for_use: true,
+              last_run_formatted: last_run_formatted,
+              registry_entries: defined?(SeedRegistryEntry) && SeedRegistryEntry.table_exists? ? SeedRegistryEntry.count : 0
+            }
+          else
+            @seed_configuration = {
+              status: 'Database is not initialized or is currently being restored',
+              status_icon: 'fa-exclamation-triangle',
+              status_color: 'danger',
+              ready_for_use: true,
+              last_run_formatted: 'N/A',
+              registry_entries: 0
+            }
+          end
+        rescue => e
+          Rails.logger.error "Error fetching seed configuration: #{e.message}"
+          @seed_configuration = {
+            status: 'Error reading seed configuration',
+            status_icon: 'fa-exclamation-triangle',
+            status_color: 'danger',
+            ready_for_use: true,
+            last_run_formatted: 'N/A',
+            registry_entries: 0
+          }
+        end
+      elsif defined?(SeedRegistryEntry) && SeedRegistryEntry.table_exists?
         registry_entries = SeedRegistryEntry.count
         @seed_configuration = {
           status: 'Ready for YAML operations',
+          status_icon: 'fa-check',
+          status_color: 'success',
           ready_for_use: true,
           last_run_formatted: 'N/A',
           registry_entries: registry_entries
@@ -369,11 +505,47 @@ module Yass
       else
         @seed_configuration = {
           status: 'YASS ready (no seed registry found)',
+          status_icon: 'fa-check',
+          status_color: 'success',
           ready_for_use: true,
           last_run_formatted: 'N/A',
           registry_entries: 0
         }
       end
+    end
+
+    def seed_configuration_table_exists?
+      begin
+        ActiveRecord::Base.connection.table_exists?('seed_configuration')
+      rescue => e
+        Rails.logger.error "Error checking if seed_configuration table exists: #{e.message}"
+        false
+      end
+    end
+
+    def get_status_icon_and_color(status)
+      status_lower = status.downcase
+      
+      # Green for complete/success states
+      if status_lower.include?('complete') || status_lower.include?('success') || status_lower.include?('restored successfully')
+        return ['fa-check-circle', 'success']
+      end
+      
+      # Red for error/failed states
+      if status_lower.include?('error') || status_lower.include?('failed')
+        return ['fa-exclamation-circle', 'danger']
+      end
+      
+      # Yellow for in-progress/processing states
+      if status_lower.include?('in_progress') || status_lower.include?('processing') || 
+         status_lower.include?('seeding') || status_lower.include?('populating') || 
+         status_lower.include?('removing') || status_lower.include?('truncating') || 
+         status_lower.include?('updating') || status_lower.include?('queued')
+        return ['fa-spinner', 'warning']
+      end
+      
+      # Default to success for ready states
+      return ['fa-check', 'success']
     end
   end
 end
