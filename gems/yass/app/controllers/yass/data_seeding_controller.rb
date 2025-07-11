@@ -334,6 +334,55 @@ module Yass
       end
     end
 
+    def upload_yaml_file
+      uploaded_file = params[:file]
+      
+      if uploaded_file.blank?
+        return render json: { message: 'No file uploaded' }, status: :bad_request
+      end
+
+      begin
+        # Validate file type
+        unless uploaded_file.content_type.in?(['application/x-yaml', 'text/yaml', 'text/plain', 'application/octet-stream']) || 
+               uploaded_file.original_filename.match(/\.(yml|yaml)$/i)
+          return render json: { message: 'Invalid file type. Please upload a YAML file (.yml or .yaml)' }, status: :bad_request
+        end
+        
+        # Validate file size (max 10MB)
+        max_size = 10.megabytes
+        if uploaded_file.size > max_size
+          return render json: { 
+            message: "File too large. Maximum size is #{number_to_human_size(max_size)}" 
+          }, status: :bad_request
+        end
+        
+        # Read file content
+        content = uploaded_file.read
+        
+        # Validate YAML syntax
+        begin
+          YAML.safe_load(content)
+        rescue Psych::SyntaxError => e
+          return render json: { 
+            message: "Invalid YAML syntax in uploaded file: #{e.message}" 
+          }, status: :bad_request
+        end
+        
+        # Return the file content for the textarea
+        render json: { 
+          content: content,
+          filename: uploaded_file.original_filename,
+          size: uploaded_file.size,
+          size_formatted: number_to_human_size(uploaded_file.size),
+          message: 'File uploaded successfully'
+        }, status: :ok
+        
+      rescue => e
+        Rails.logger.error "Error uploading YAML file: #{e.message}"
+        render json: { message: "Error processing uploaded file: #{e.message}" }, status: :unprocessable_entity
+      end
+    end
+
     def run_static_qa_data
       # This would need to be implemented based on the host application's seeding system
       render json: { message: 'Static QA data seeding not implemented in YASS gem' }, status: :not_implemented

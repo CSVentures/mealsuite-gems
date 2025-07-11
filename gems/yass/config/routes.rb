@@ -12,6 +12,7 @@ Yass::Engine.routes.draw do
   post 'data_seeding/validate_yaml_raw', to: 'data_seeding#validate_yaml_raw'
   get 'data_seeding/list_yaml_files', to: 'data_seeding#list_yaml_files'
   get 'data_seeding/get_yaml_file_content', to: 'data_seeding#get_yaml_file_content'
+  post 'data_seeding/upload_yaml_file', to: 'data_seeding#upload_yaml_file'
   post 'data_seeding/run_static_qa_data', to: 'data_seeding#run_static_qa_data'
   get 'data_seeding/backup_info', to: 'data_seeding#backup_info'
   post 'data_seeding/create_backup', to: 'data_seeding#create_backup'

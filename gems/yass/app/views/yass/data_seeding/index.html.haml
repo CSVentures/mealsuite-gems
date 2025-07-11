@@ -8,6 +8,19 @@
   .yaml-files-container .list-group-item { border-left: none; border-right: none; }
   .btn-group .btn { color: white; }
   .btn-group .btn + .btn { margin-left: 0.25rem; }
+  
+  /* File action buttons styling */
+  .file-actions-section .btn-outline-dark {
+    border-color: #343a40;
+    color: #343a40;
+  }
+  .file-actions-section .btn-outline-dark:hover {
+    background-color: #343a40;
+    color: white;
+  }
+  .file-actions-section .btn-outline-dark:focus {
+    box-shadow: 0 0 0 0.2rem rgba(52, 58, 64, 0.25);
+  }
   #backup-dropdown-list { max-height: 200px; overflow-y: auto; }
   #backup-dropdown-list .dropdown-item { padding: 0.5rem 1rem; }
   #backup-dropdown-list .dropdown-item div { line-height: 1.2; }
@@ -180,10 +193,26 @@
                     .col-md-9.d-flex.flex-column
                       %form#yaml-raw-form.h-100.d-flex.flex-column
                         .form-group.flex-grow-1.d-flex.flex-column
+                          .file-upload-section.mb-3
+                            .input-group
+                              .custom-file
+                                %input{type: "file", class: "custom-file-input", id: "yaml-file-input", accept: ".yml,.yaml"}
+                                %label{class: "custom-file-label", for: "yaml-file-input"} Choose YAML file...
+                              .input-group-append
+                                %button{type: "button", class: "btn btn-outline-primary", id: "upload-yaml-btn"}
+                                  %i.fas.fa-upload
+                                  Upload
+                                %button{type: "button", class: "btn btn-outline-dark", id: "save-yaml-btn"}
+                                  %i.fas.fa-save
+                                  Save
+                                %button{type: "button", class: "btn btn-outline-dark", id: "save-as-yaml-btn"}
+                                  %i.fas.fa-download
+                                  Save As
+                            %small.text-muted Upload a YAML file from your computer or save the current content to disk
                           .lined-textarea-container.raw-yaml-textarea.flex-grow-1
                             .line-numbers#line-numbers 1
                             %textarea{name: "yaml_content", id: "yaml-content-textarea", placeholder: "metadata:\n  context: 'Test Data'\ndata:\n  facilities:\n    - factory: facility\n      attributes:\n        name: 'Test Facility'", class: "lined-textarea"}
-                          %small.text-muted.mt-2 Paste YAML content directly
+                          %small.text-muted.mt-2 Paste YAML content directly or upload a file above
                         .btn-group.mt-3{role: "group"}
                           %button{type: "submit", class: "btn btn-success"}
                             %i.fas.fa-upload
@@ -196,7 +225,13 @@
                         %h6 
                           %i.fas.fa-code
                           Raw YAML
-                        %p.mb-0.small Paste YAML content directly for immediate loading. Useful for testing small configurations or when files aren't available in the yass/ directory.
+                        %p.mb-2.small Paste YAML content directly or upload a file from your computer for immediate loading. Useful for testing configurations or when files aren't available in the yass/ directory.
+                        %p.mb-2.small 
+                          %strong Upload: 
+                          Select a .yml or .yaml file from your local disk to populate the text area automatically.
+                        %p.mb-0.small 
+                          %strong Save: 
+                          Download the current YAML content to your local disk. Use "Save As" to specify a custom filename.
               
               / Tab 4: Backup/Restore
               .tab-pane.fade{id: "backup-restore-panel", role: "tabpanel"}
@@ -307,6 +342,33 @@
       .modal-footer
         %button{type: "button", class: "btn btn-primary", "data-dismiss": "modal"} Close
 
+/ Save As Modal
+#saveAsModal.modal.fade{tabindex: "-1", role: "dialog", "aria-labelledby": "saveAsModalLabel", "aria-hidden": "true"}
+  .modal-dialog.modal-md{role: "document"}
+    .modal-content
+      .modal-header
+        %h5#saveAsModalLabel.modal-title
+          %i.fas.fa-download
+          Save YAML File
+        %button{type: "button", class: "close", "data-dismiss": "modal", "aria-label": "Close"}
+          %span{"aria-hidden": "true"} &times;
+      .modal-body
+        .form-group
+          %label{for: "save-filename-input"} Filename
+          .input-group
+            %input{type: "text", class: "form-control", id: "save-filename-input", placeholder: "my-yaml-file", value: "yaml-content"}
+            .input-group-append
+              %span.input-group-text .yml
+          %small.text-muted Enter a filename without extension (will be saved as .yml)
+        .form-group
+          %label Content Preview
+          %textarea{class: "form-control", id: "save-content-preview", rows: "6", readonly: true}
+      .modal-footer
+        %button{type: "button", class: "btn btn-secondary", "data-dismiss": "modal"} Cancel
+        %button{type: "button", class: "btn btn-primary", id: "confirm-save-btn"}
+          %i.fas.fa-download
+          Download
+
 :javascript
   document.addEventListener('DOMContentLoaded', function() {
     // Load file list on startup
@@ -373,6 +435,15 @@
     // Handle backup/restore buttons
     document.getElementById('create-backup-btn').addEventListener('click', handleCreateBackup);
     document.getElementById('restore-backup-btn').addEventListener('click', handleRestoreBackup);
+
+    // Handle file upload
+    document.getElementById('upload-yaml-btn').addEventListener('click', handleFileUpload);
+    document.getElementById('yaml-file-input').addEventListener('change', updateFileLabel);
+
+    // Handle save functionality
+    document.getElementById('save-yaml-btn').addEventListener('click', handleSaveYaml);
+    document.getElementById('save-as-yaml-btn').addEventListener('click', handleSaveAsYaml);
+    document.getElementById('confirm-save-btn').addEventListener('click', handleConfirmSave);
 
     function loadYamlFilesMain() {
       const container = document.getElementById('yaml-files-container');
@@ -1427,4 +1498,249 @@
         button.disabled = false;
       });
     }
+
+    // File upload functionality
+    function updateFileLabel() {
+      const input = document.getElementById('yaml-file-input');
+      const label = document.querySelector('.custom-file-label');
+      
+      if (input.files && input.files.length > 0) {
+        const fileName = input.files[0].name;
+        label.textContent = fileName;
+        
+        // Store filename for potential save operations (before upload)
+        currentUploadedFilename = fileName;
+        console.log('File selected, stored filename:', currentUploadedFilename);
+      } else {
+        label.textContent = 'Choose YAML file...';
+        currentUploadedFilename = null;
+        console.log('No file selected, cleared filename');
+      }
+    }
+
+    function handleFileUpload() {
+      const input = document.getElementById('yaml-file-input');
+      const button = document.getElementById('upload-yaml-btn');
+      const textarea = document.getElementById('yaml-content-textarea');
+      
+      if (!input.files || input.files.length === 0) {
+        showError({ message: 'Please select a file first' });
+        return;
+      }
+      
+      const file = input.files[0];
+      
+      // Validate file type
+      if (!file.name.match(/\.(yml|yaml)$/i)) {
+        showError({ message: 'Please select a valid YAML file (.yml or .yaml)' });
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        showError({ message: 'File too large. Maximum size is 10MB' });
+        return;
+      }
+      
+      // Show loading state
+      const originalContent = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+      button.disabled = true;
+      
+      // Create FormData and upload
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      fetch('#{data_seeding_path}/upload_yaml_file', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        return response.json().then(data => {
+          data._responseStatus = response.status;
+          data._responseOk = response.ok;
+          return data;
+        });
+      })
+      .then(data => {
+        if (data._responseOk && data.content) {
+          // Populate textarea with file content
+          textarea.value = data.content;
+          
+          // Update line numbers
+          if (window.yamlLineNumbers) {
+            window.yamlLineNumbers.updateLineNumbers();
+          }
+          
+          // Focus on textarea
+          textarea.focus();
+          textarea.scrollTop = 0;
+          
+          // Store the filename for save functionality
+          currentUploadedFilename = data.filename;
+          console.log('Upload successful, stored filename from server:', data.filename);
+          
+          // Show success message
+          showUploadSuccessMessage(data.filename, data.size_formatted);
+        } else {
+          showError({ message: data.message || 'Error uploading file' });
+        }
+      })
+      .catch(error => {
+        showError(error);
+      })
+      .finally(() => {
+        // Reset button state
+        button.innerHTML = originalContent;
+        button.disabled = false;
+      });
+    }
+
+    function showUploadSuccessMessage(filename, size) {
+      // Create a temporary success message
+      const message = `File "${filename}" (${size}) uploaded successfully`;
+      
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+      alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+      alertDiv.innerHTML = `
+        <i class="fas fa-check-circle"></i> ${message}
+        <button type="button" class="close" data-dismiss="alert">
+          <span>&times;</span>
+        </button>
+      `;
+      
+      document.body.appendChild(alertDiv);
+      
+      // Auto-remove after 4 seconds
+      setTimeout(() => {
+        if (alertDiv.parentNode) {
+          alertDiv.parentNode.removeChild(alertDiv);
+        }
+      }, 4000);
+    }
+
+    // Save functionality
+    let currentUploadedFilename = null; // Track the last uploaded filename
+
+    function handleSaveYaml() {
+      const textarea = document.getElementById('yaml-content-textarea');
+      const content = textarea.value;
+      
+      if (!content.trim()) {
+        showError({ message: 'No YAML content to save' });
+        return;
+      }
+      
+      // Use the uploaded filename if available, otherwise use default
+      const filename = currentUploadedFilename || 'yaml-content.yml';
+      console.log('Saving with filename:', filename, 'currentUploadedFilename:', currentUploadedFilename);
+      downloadYamlFile(content, filename);
+    }
+
+    function handleSaveAsYaml() {
+      const textarea = document.getElementById('yaml-content-textarea');
+      const content = textarea.value;
+      
+      if (!content.trim()) {
+        showError({ message: 'No YAML content to save' });
+        return;
+      }
+      
+      // Pre-populate the filename input
+      const filenameInput = document.getElementById('save-filename-input');
+      const contentPreview = document.getElementById('save-content-preview');
+      
+      // Use uploaded filename without extension, or default
+      let defaultName = 'yaml-content';
+      if (currentUploadedFilename) {
+        defaultName = currentUploadedFilename.replace(/\.(yml|yaml)$/i, '');
+      }
+      
+      filenameInput.value = defaultName;
+      contentPreview.value = content.length > 500 ? content.substring(0, 500) + '...' : content;
+      
+      // Show the modal
+      $('#saveAsModal').modal('show');
+    }
+
+    function handleConfirmSave() {
+      const filenameInput = document.getElementById('save-filename-input');
+      const textarea = document.getElementById('yaml-content-textarea');
+      
+      let filename = filenameInput.value.trim();
+      const content = textarea.value;
+      
+      if (!filename) {
+        showError({ message: 'Please enter a filename' });
+        return;
+      }
+      
+      // Sanitize filename
+      filename = filename.replace(/[^a-zA-Z0-9\-_]/g, '-');
+      
+      // Add .yml extension if not present
+      if (!filename.match(/\.(yml|yaml)$/i)) {
+        filename += '.yml';
+      }
+      
+      // Hide the modal
+      $('#saveAsModal').modal('hide');
+      
+      // Download the file
+      downloadYamlFile(content, filename);
+      
+      // Show success message
+      showSaveSuccessMessage(filename);
+    }
+
+    function downloadYamlFile(content, filename) {
+      try {
+        // Create a Blob with the YAML content
+        const blob = new Blob([content], { type: 'text/yaml' });
+        
+        // Create a temporary URL for the blob
+        const url = URL.createObjectURL(blob);
+        
+        // Create a temporary anchor element and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Clean up the URL
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        showError({ message: 'Error downloading file: ' + error.message });
+      }
+    }
+
+    function showSaveSuccessMessage(filename) {
+      const message = `File "${filename}" saved successfully`;
+      
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+      alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+      alertDiv.innerHTML = `
+        <i class="fas fa-check-circle"></i> ${message}
+        <button type="button" class="close" data-dismiss="alert">
+          <span>&times;</span>
+        </button>
+      `;
+      
+      document.body.appendChild(alertDiv);
+      
+      // Auto-remove after 3 seconds
+      setTimeout(() => {
+        if (alertDiv.parentNode) {
+          alertDiv.parentNode.removeChild(alertDiv);
+        }
+      }, 3000);
+    }
+
   });
